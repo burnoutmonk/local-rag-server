@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+httpx
+pydantic
+pypdf
+python-docx
+qdrant-client
+sentence-transformers
+numpy
+tqdm
+jinja2
+huggingface-hub
