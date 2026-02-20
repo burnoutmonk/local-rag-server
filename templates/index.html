@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181c27;
+      --border:    #252a38;
+      --accent:    #4f8ef7;
+      --accent2:   #7c3aed;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --success:   #22c55e;
+      --warning:   #f59e0b;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'IBM Plex Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-weight: 300;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface);
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .logo span { color: var(--muted); }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-left: auto;
+      transition: background 0.3s;
+    }
+    .status-dot.online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+    .status-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: calc(100vh - 57px - 40px);
+    }
+
+    /* ── Sidebar ── */
+    sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.6rem;
+    }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      padding: 0.55rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .mode-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+
+    /* Sliders */
+    .control { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-header label {
+      font-size: 0.78rem;
+      color: var(--text);
+    }
+
+    .control-value {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+    /* Timeout */
+    .timeout-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .timeout-row input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px; height: 14px;
+      cursor: pointer;
+    }
+
+    .timeout-row label { font-size: 0.78rem; color: var(--muted); cursor: pointer; }
+
+    /* ── Main ── */
+    main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Chat window */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      scroll-behavior: smooth;
+    }
+
+    #chat::-webkit-scrollbar { width: 4px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Empty state */
+    .empty-state {
+      margin: auto;
+      text-align: center;
+      opacity: 0.4;
+    }
+
+    .empty-state .big {
+      font-family: var(--mono);
+      font-size: 2.5rem;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .empty-state p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Messages */
+    .msg { display: flex; flex-direction: column; gap: 0.3rem; animation: fadeUp 0.2s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-role {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .msg.user .msg-role { color: var(--accent); }
+    .msg.assistant .msg-role { color: var(--success); }
+    .msg.error .msg-role { color: var(--warning); }
+
+    .msg-body {
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg.user .msg-body {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: inline-block;
+      max-width: 80%;
+    }
+
+    /* Citations */
+    .citations {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .citation-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .citation-tag:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Tooltip */
+    .citation-tag .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      font-size: 0.7rem;
+      color: var(--text);
+      width: 260px;
+      z-index: 10;
+      white-space: normal;
+      line-height: 1.5;
+      font-family: var(--sans);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .citation-tag:hover .tooltip { display: block; }
+
+    /* Thinking indicator */
+    .thinking {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+    }
+
+    #thinking-timer {
+      color: var(--accent);
+      min-width: 3rem;
+    }
+
+    .msg-timer {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+
+    .dots { display: flex; gap: 3px; }
+    .dots span {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1s infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.15s; }
+    .dots span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40%            { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* ── Input bar ── */
+    .input-bar {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      background: var(--surface);
+    }
+
+    #query {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 300;
+      padding: 0.7rem 1rem;
+      resize: none;
+      outline: none;
+      min-height: 44px;
+      max-height: 140px;
+      transition: border-color 0.15s;
+      line-height: 1.5;
+    }
+    #query:focus { border-color: var(--accent); }
+    #query::placeholder { color: var(--muted); }
+
+    #send-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      padding: 0.7rem 1.2rem;
+      text-transform: uppercase;
+      transition: all 0.15s;
+      white-space: nowrap;
+      height: 44px;
+    }
+    #send-btn:hover:not(:disabled) { background: #3b7ef6; transform: translateY(-1px); }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 2rem;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--muted);
+      display: flex;
+      gap: 1.5rem;
+      background: var(--surface);
+    }
+
+    /* ── Scrollbar global ── */
+    sidebar::-webkit-scrollbar { width: 3px; }
+    sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">local<span>/</span>rag</div>
+  <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-label" id="status-label">checking...</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <sidebar>
+
+    <div>
+      <div class="section-label">Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-answer" onclick="setMode('answer')">Answer</button>
+        <button class="mode-btn"        id="btn-search" onclick="setMode('search')">Search</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Retrieval</div>
+      <div class="control">
+        <div class="control-header">
+          <label>Top K chunks</label>
+          <span class="control-value" id="topk-val">5</span>
+        </div>
+        <input type="range" id="topk" min="1" max="20" value="5"
+               oninput="document.getElementById('topk-val').textContent=this.value">
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Timeout</div>
+      <div class="control">
+        <div class="control-header">
+          <label>Max wait</label>
+          <span class="control-value" id="timeout-val">30s</span>
+        </div>
+        <input type="range" id="timeout-slider" min="10" max="120" value="30"
+               oninput="document.getElementById('timeout-val').textContent=this.value+'s'">
+        <div class="timeout-row" style="margin-top:0.4rem;">
+          <input type="checkbox" id="no-timeout">
+          <label for="no-timeout">No limit</label>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;">
+      <div class="section-label">Session</div>
+      <button onclick="clearChat()" style="
+        background:transparent;border:1px solid var(--border);border-radius:6px;
+        color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:0.68rem;
+        letter-spacing:0.06em;padding:0.45rem 0.8rem;text-transform:uppercase;
+        transition:all 0.15s;width:100%;">
+        Clear chat
+      </button>
+    </div>
+
+  </sidebar>
+
+  <!-- ── Main ── -->
+  <main>
+    <div id="chat">
+      <div class="empty-state" id="empty">
+        <div class="big">[ ]</div>
+        <p>Ask anything about your documents.</p>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <textarea id="query" rows="1" placeholder="Ask a question…"></textarea>
+      <button id="send-btn" onclick="send()">Send</button>
+    </div>
+  </main>
+
+</div>
+
+<footer>
+  <span id="footer-mode">mode: answer</span>
+  <span id="footer-topk">top-k: 5</span>
+  <span id="footer-timeout">timeout: 30s</span>
+</footer>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let mode = 'answer';
+
+  // ── Health check ──────────────────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const r = await fetch('/health');
+      if (r.ok) {
+        document.getElementById('status-dot').classList.add('online');
+        document.getElementById('status-label').textContent = 'online';
+      }
+    } catch {
+      document.getElementById('status-label').textContent = 'offline';
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 15000);
+
+  // ── Mode ──────────────────────────────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btn-answer').classList.toggle('active', m === 'answer');
+    document.getElementById('btn-search').classList.toggle('active', m === 'search');
+    document.getElementById('footer-mode').textContent = `mode: ${m}`;
+  }
+
+  // ── Sync footer ───────────────────────────────────────────────────────────
+  document.getElementById('topk').addEventListener('input', e => {
+    document.getElementById('footer-topk').textContent = `top-k: ${e.target.value}`;
+  });
+  document.getElementById('timeout-slider').addEventListener('input', e => {
+    updateFooterTimeout();
+  });
+  document.getElementById('no-timeout').addEventListener('change', updateFooterTimeout);
+
+  function updateFooterTimeout() {
+    const noLimit = document.getElementById('no-timeout').checked;
+    document.getElementById('footer-timeout').textContent = noLimit
+      ? 'timeout: none'
+      : `timeout: ${document.getElementById('timeout-slider').value}s`;
+  }
+
+  // ── Auto-resize textarea ──────────────────────────────────────────────────
+  const textarea = document.getElementById('query');
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+  });
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  // ── Chat helpers ──────────────────────────────────────────────────────────
+  function hideEmpty() {
+    const el = document.getElementById('empty');
+    if (el) el.remove();
+  }
+
+  function appendMsg(role, body, citations = [], elapsed = null) {
+    hideEmpty();
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+
+    const roleEl = document.createElement('div');
+    roleEl.className = 'msg-role';
+    roleEl.textContent = role === 'user' ? '→ you' : role === 'error' ? '⚠ error' : '← assistant';
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'msg-body';
+    bodyEl.textContent = body;
+
+    div.appendChild(roleEl);
+    if (elapsed && role === 'assistant') {
+      const timerEl = document.createElement('div');
+      timerEl.className = 'msg-timer';
+      timerEl.textContent = `${elapsed}s`;
+      div.appendChild(timerEl);
+    }
+    div.appendChild(bodyEl);
+
+    if (citations.length > 0) {
+      const citeRow = document.createElement('div');
+      citeRow.className = 'citations';
+      citations.forEach(c => {
+        const tag = document.createElement('span');
+        tag.className = 'citation-tag';
+        tag.textContent = `[${c.tag}]`;
+        const tip = document.createElement('div');
+        tip.className = 'tooltip';
+        tip.textContent = `${c.source_file}\n${c.section || ''}\nchunk ${c.chunk_index ?? '?'}`;
+        tag.appendChild(tip);
+        citeRow.appendChild(tag);
+      });
+      div.appendChild(citeRow);
+    }
+
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  let thinkingInterval = null;
+  let thinkingStart = null;
+
+  function appendThinking() {
+    hideEmpty();
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    div.id = 'thinking';
+    div.innerHTML = `
+      <div class="msg-role">← assistant</div>
+      <div class="thinking">
+        <div class="dots"><span></span><span></span><span></span></div>
+        thinking <span id="thinking-timer">0.0s</span>
+      </div>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+
+    thinkingStart = Date.now();
+    thinkingInterval = setInterval(() => {
+      const el = document.getElementById('thinking-timer');
+      if (el) el.textContent = ((Date.now() - thinkingStart) / 1000).toFixed(1) + 's';
+    }, 100);
+  }
+
+  function removeThinking() {
+    clearInterval(thinkingInterval);
+    thinkingInterval = null;
+    const elapsed = thinkingStart ? ((Date.now() - thinkingStart) / 1000).toFixed(1) : null;
+    thinkingStart = null;
+    const el = document.getElementById('thinking');
+    if (el) el.remove();
+    return elapsed;
+  }
+
+  function clearChat() {
+    const chat = document.getElementById('chat');
+    chat.innerHTML = `
+      <div class="empty-state" id="empty">
+        <div class="big">[ ]</div>
+        <p>Ask anything about your documents.</p>
+      </div>`;
+  }
+
+  // ── Send ──────────────────────────────────────────────────────────────────
+  async function send() {
+    const query = textarea.value.trim();
+    if (!query) return;
+
+    const topK     = parseInt(document.getElementById('topk').value);
+    const noLimit  = document.getElementById('no-timeout').checked;
+    const timeout  = noLimit ? null : parseInt(document.getElementById('timeout-slider').value);
+
+    textarea.value = '';
+    textarea.style.height = 'auto';
+    document.getElementById('send-btn').disabled = true;
+
+    appendMsg('user', query);
+    appendThinking();
+
+    try {
+      const res = await fetch('/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, top_k: topK, mode, timeout }),
+      });
+
+      const elapsed = removeThinking();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        appendMsg('error', err.detail || `HTTP ${res.status}`);
+      } else {
+        const data = await res.json();
+        appendMsg('assistant', data.answer, data.citations || [], elapsed);
+      }
+    } catch (e) {
+      removeThinking();
+      appendMsg('error', `Request failed: ${e.message}`);
+    } finally {
+      document.getElementById('send-btn').disabled = false;
+      textarea.focus();
+    }
+  }
+</script>
+
+</body>
+</html>

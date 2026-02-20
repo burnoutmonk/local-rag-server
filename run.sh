@@ -60,12 +60,35 @@ else
     fi
 
     echo "  Building..."
-    cmake -B "$LLAMA_DIR/build" -S "$LLAMA_DIR" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF > /dev/null
+    # Check if CUDA is available and build with GPU support if so
+    if command -v nvcc &> /dev/null; then
+        echo "  CUDA found — building with GPU support..."
+        cmake -B "$LLAMA_DIR/build" -S "$LLAMA_DIR" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_CUDA=ON > /dev/null
+    else
+        echo "  CUDA not found — building CPU only..."
+        cmake -B "$LLAMA_DIR/build" -S "$LLAMA_DIR" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF > /dev/null
+    fi
     cmake --build "$LLAMA_DIR/build" --config Release -j"$(nproc)" > /dev/null
 
     echo "  llama.cpp built successfully."
     export PATH="$LLAMA_DIR/build/bin:$PATH"
     echo ""
+fi
+
+# ── CUDA check ───────────────────────────────────────────────────────────────
+if command -v nvcc &> /dev/null; then
+    if "$LLAMA_DIR/build/bin/llama-server" --version 2>&1 | grep -q "CUDA\|cublas\|cuda"; then
+        echo "GPU support: CUDA enabled"
+    elif command -v llama-server &> /dev/null && llama-server --version 2>&1 | grep -q "CUDA\|cublas\|cuda"; then
+        echo "GPU support: CUDA enabled"
+    else
+        echo ""
+        echo "WARNING: CUDA is installed on your system but llama-server was built without GPU support."
+        echo "  To enable GPU acceleration, delete the build and rerun:"
+        echo "    rm -rf llama.cpp/build"
+        echo "    ./run.sh"
+        echo ""
+    fi
 fi
 
 # ── Launch ────────────────────────────────────────────────────────────────────
