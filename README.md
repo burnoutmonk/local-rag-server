@@ -28,6 +28,19 @@ PDF / DOCX files
 
 ---
 
+<<<<<<< HEAD
+=======
+## Platform Support
+
+| Platform | Supported |
+|---|---|
+| Linux | ✅ Native |
+| macOS | ✅ Native |
+| Windows | ⚠️ Use WSL2 |
+
+**Windows users:** This project is designed for Linux/macOS. On Windows, install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the same instructions inside a WSL terminal. WSL2 gives you a full Linux environment and is the recommended setup for local LLM work on Windows anyway.
+
+>>>>>>> cdccc47bf69d2bd17092da2c5c8690b7d7592afc
 ## Requirements
 
 - Python 3.10+
@@ -157,4 +170,8 @@ Returns `{"ok": true}` if the API is running.
 - **Speed:** MiniLM embeds ~1000 chunks/min on CPU. Ingestion is a one-time cost.
 - **Chunk size:** `MAX_CHARS=1000` works well for most documents. Reduce to 600-700 for documents with many short definitions.
 - **PDF cleaning:** `clean_pdf_text()` in `ingest.py` strips page numbers, TOC lines, and copyright watermarks automatically. Add custom rules for your document patterns.
+<<<<<<< HEAD
 - **Upgrading embeddings:** For better retrieval quality at the cost of needing a GPU, swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search with Qdrant.
+=======
+- **Upgrading embeddings:** For better retrieval quality at the cost of needing a GPU, swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search with Qdrant.
+>>>>>>> cdccc47bf69d2bd17092da2c5c8690b7d7592afc
