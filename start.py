@@ -259,7 +259,7 @@ def start_api(procs: list) -> None:
     cmd = [sys.executable, "-m", "uvicorn", "rag_api:app", "--host", API_HOST, "--port", str(API_PORT)]
     proc = subprocess.Popen(cmd)
     procs.append(("Web UI", proc))
-    wait_for_http(f"http://localhost:{API_PORT}/health", "Web UI", 15)
+    wait_for_http(f"http://localhost:{API_PORT}/health", "Web UI", 60)
     print(f"\n  Open your browser at: http://<your-server-ip>:{API_PORT}")
 
 

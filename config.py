@@ -84,7 +84,7 @@ MIN_TOKENS = 150
 # Typical values:
 #   - CPU only (4-8B model):  3–15 tok/s
 #   - GPU (4-8B model):       30–80 tok/s
-TOKENS_PER_SECOND = 5.3
+TOKENS_PER_SECOND = 7.0
 
 # RETRIEVAL_OVERHEAD_S: time taken for embedding + Qdrant query.
 # MiniLM on CPU is typically 0.5–1.5s. Increase if you have many chunks.
