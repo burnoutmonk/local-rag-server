@@ -28,6 +28,16 @@ PDF / DOCX files
 
 ---
 
+## Platform Support
+
+| Platform | Supported |
+|---|---|
+| Linux | ✅ Native |
+| macOS | ✅ Native |
+| Windows | ⚠️ Use WSL2 |
+
+**Windows users:** This project is designed for Linux/macOS. On Windows, install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the same instructions inside a WSL terminal. WSL2 gives you a full Linux environment and is the recommended setup for local LLM work on Windows anyway.
+
 ## Requirements
 
 - Python 3.10+
