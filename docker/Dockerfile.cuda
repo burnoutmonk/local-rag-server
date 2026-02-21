@@ -31,7 +31,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 
-COPY config.py ingest.py rag_api.py download_model.py benchmark.py ./
+COPY config.py ingest.py rag_api.py download_model.py ./
+COPY scripts/benchmark.py benchmark.py
 COPY templates/ templates/
 
 EXPOSE 8000 8080

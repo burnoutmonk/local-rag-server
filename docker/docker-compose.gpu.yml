@@ -1,20 +1,20 @@
 services:
   model_downloader:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
 
   ingest:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
 
   llm:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
     deploy:
       resources:
@@ -26,12 +26,12 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
 
   benchmark:
     build:
-      context: .
-      dockerfile: Dockerfile.cuda
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda

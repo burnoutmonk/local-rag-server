@@ -16,47 +16,64 @@ services:
       start_period: 5s
 
   model_downloader:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_model_downloader
-    command: python3 download_model.py
+    command:
+      - sh
+      - -c
+      - >-
+        test -f /models/$$LLM_MODEL_FILE
+        && echo "Model already exists — skipping."
+        || python3 download_model.py
     volumes:
-      - ./models:/models
+      - ../models:/models
     environment:
       - LLM_MODEL_FILE=${LLM_MODEL_FILE}
       - LLM_MODEL_REPO=${LLM_MODEL_REPO}
     restart: "no"
 
   llm:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: rag_llm
-    command: /llama.cpp/build/bin/llama-server
-      --model /models/${LLM_MODEL_FILE}
-      --host 0.0.0.0
-      --port 8080
-      --ctx-size ${LLM_CONTEXT:-4096}
-      --threads ${LLM_THREADS:-8}
-      --n-gpu-layers ${LLM_GPU_LAYERS:-0}
+    env_file: ../.env
+    command:
+      - sh
+      - -c
+      - >-
+        /llama.cpp/build/bin/llama-server
+        --model /models/$$LLM_MODEL_FILE
+        --host 0.0.0.0
+        --port 8080
+        --ctx-size $${LLM_CONTEXT:-4096}
+        --threads $${LLM_THREADS:-8}
+        --n-gpu-layers $${LLM_GPU_LAYERS:-0}
     ports:
       - "8080:8080"
     volumes:
-      - ./models:/models
+      - ../models:/models
     depends_on:
       model_downloader:
         condition: service_completed_successfully
     restart: unless-stopped
 
   ingest:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_ingest
     command: python3 ingest.py
-    env_file: .env
+    env_file: ../.env
     environment:
       - QDRANT_HOST=qdrant
     volumes:
-      - ./data_raw:/app/data_raw
-      - ./models:/app/models
+      - ../data_raw:/app/data_raw
+      - ../models:/app/models
       - ingest_state:/app/state
     depends_on:
       qdrant:
@@ -66,11 +83,13 @@ services:
     restart: "no"
 
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_api
     command: uvicorn rag_api:app --host 0.0.0.0 --port 8000
-    env_file: .env
+    env_file: ../.env
     environment:
       - QDRANT_HOST=qdrant
       - LLM_URL=http://rag_llm:8080/v1/chat/completions
@@ -81,6 +100,8 @@ services:
         condition: service_healthy
       ingest:
         condition: service_completed_successfully
+      benchmark:
+        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8000' 2>/dev/null && exit 0 || exit 1"]
@@ -90,12 +111,14 @@ services:
       start_period: 10s
 
   benchmark:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_benchmark
     command: python3 benchmark.py
     volumes:
-      - .:/app/host_env  # mount project dir so benchmark can update .env
+      - ..:/app/host_env  # mount project dir so benchmark can update .env
     environment:
       - LLM_URL=http://rag_llm:8080/v1/chat/completions
       - LLM_PORT=8080

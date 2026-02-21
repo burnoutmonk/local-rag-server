@@ -12,7 +12,6 @@ from tqdm import tqdm
 from pypdf import PdfReader
 import docx
 
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
@@ -199,38 +198,28 @@ def main() -> None:
         print(f"    * {f.name}  ({f.stat().st_size/1024:.1f} KB)")
     print(f"{'='*50}\n")
 
-    # Step 1: Load embedder
-    print(f"[1/4] Loading embedding model: {EMBED_MODEL_NAME} ...")
-    t0 = time.time()
-    embedder = SentenceTransformer(EMBED_MODEL_NAME)
-    dim = embedder.get_sentence_embedding_dimension()
-    print(f"      Model loaded in {time.time()-t0:.1f}s  (dim={dim})\n")
-
-    # Step 2: Connect to Qdrant
-    print(f"[2/4] Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT} ...")
+    # Step 1: Connect to Qdrant
+    print(f"[1/4] Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT} ...")
     t0 = time.time()
     client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-
-    if not client.collection_exists(COLLECTION):
-        print(f"      Collection '{COLLECTION}' not found -- creating fresh.")
-        client.create_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
-        )
+    collection_exists = client.collection_exists(COLLECTION)
+    current_count = 0
+    if collection_exists:
+        current_count = client.get_collection(COLLECTION).points_count or 0
+        print(f"      Collection '{COLLECTION}' exists with {current_count} points.")
     else:
-        count = client.get_collection(COLLECTION).points_count or 0
-        print(f"      Collection '{COLLECTION}' exists with {count} points.")
-    print(f"      Collection ready in {time.time()-t0:.1f}s\n")
+        print(f"      Collection '{COLLECTION}' not found — will create once model is loaded.")
+    print(f"      Connected in {time.time()-t0:.1f}s\n")
 
-    # Step 3: Check hashes — skip unchanged files
-    print(f"[3/4] Checking which files need ingestion ...")
+    # Step 2: Check hashes — skip unchanged files
+    print(f"[2/4] Checking which files need ingestion ...")
     stored_hashes = load_hashes()
 
     # If collection is empty, force re-ingest regardless of hashes
-    collection_info = client.get_collection(COLLECTION)
-    if collection_info.points_count == 0 and stored_hashes:
+    if current_count == 0 and stored_hashes:
         print("      Collection is empty but hashes exist — forcing full re-ingest.")
         stored_hashes = {}
+
     new_hashes = {}
     files_to_ingest = []
 
@@ -261,6 +250,22 @@ def main() -> None:
         return
 
     print(f"\n  {len(files_to_ingest)} file(s) to ingest.\n")
+
+    # Step 3: Load embedder (only when there is work to do)
+    print(f"[3/4] Loading embedding model: {EMBED_MODEL_NAME} ...")
+    t0 = time.time()
+    from sentence_transformers import SentenceTransformer
+    embedder = SentenceTransformer(EMBED_MODEL_NAME)
+    dim = embedder.get_sentence_embedding_dimension()
+    print(f"      Model loaded in {time.time()-t0:.1f}s  (dim={dim})\n")
+
+    # Create collection now that we have the embedding dimension
+    if not collection_exists:
+        client.create_collection(
+            collection_name=COLLECTION,
+            vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
+        )
+        print(f"      Collection '{COLLECTION}' created.\n")
 
     # Step 4: Parse, chunk & embed changed files
     print(f"[4/4] Parsing, chunking and embedding ...")

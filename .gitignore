@@ -37,3 +37,9 @@ Thumbs.db
 
 # Docker build state
 .last_cuda
+
+# Benchmark marker (delete to re-run benchmark)
+.benchmarked
+
+# Claude
+.claude

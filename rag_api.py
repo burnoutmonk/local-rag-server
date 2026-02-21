@@ -63,6 +63,10 @@ class QueryIn(BaseModel):
     mode: str = "answer"   # "answer" or "search"
     timeout: int | None = 30
     max_tokens: int | None = None  # None = use config default
+    temperature: float | None = None
+    top_p: float | None = None
+    llm_top_k: int | None = None
+    min_p: float | None = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -166,10 +170,10 @@ def answer(q: QueryIn):
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        "temperature": LLM_TEMPERATURE,
-        "top_p": LLM_TOP_P,
-        "top_k": LLM_TOP_K,
-        "min_p": LLM_MIN_P,
+        "temperature": q.temperature if q.temperature is not None else LLM_TEMPERATURE,
+        "top_p": q.top_p if q.top_p is not None else LLM_TOP_P,
+        "top_k": q.llm_top_k if q.llm_top_k is not None else LLM_TOP_K,
+        "min_p": q.min_p if q.min_p is not None else LLM_MIN_P,
         "max_tokens": q.max_tokens if q.max_tokens else estimate_max_tokens(q.timeout, q.top_k),
     }
 

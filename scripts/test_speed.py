@@ -9,9 +9,12 @@ Usage:
 """
 
 import json
+import sys
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import LLM_URL, LLM_PORT
 
 TEST_PROMPT = (

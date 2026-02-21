@@ -164,6 +164,7 @@
 
     input[type="range"] {
       -webkit-appearance: none;
+      appearance: none;
       width: 100%;
       height: 3px;
       background: var(--border);
@@ -419,6 +420,7 @@
     /* ── Scrollbar global ── */
     sidebar::-webkit-scrollbar { width: 3px; }
     sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
   </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -427,11 +429,11 @@
 <header>
   <div class="logo">local<span>/</span>rag</div>
   <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
-    <span id="gpu-badge" style="font-family:var(--mono);font-size:0.72rem;margin-right:0.75rem;cursor:default;color:var(--muted)" title="Checking..."></span><div class="status-dot" id="status-dot"></div>
+    <span id="gpu-badge" style="font-family:var(--mono);font-size:0.72rem;cursor:default;color:var(--muted)" title="Checking..."></span>
+    <div class="status-dot" id="status-dot"></div>
     <span class="status-label" id="status-label">checking...</span>
   </div>
 </header>
-
 <div class="layout">
 
   <!-- ── Sidebar ── -->
@@ -484,6 +486,47 @@
         <input type="range" id="max-tokens-slider" min="100" max="2000" step="50" value="500"
                oninput="document.getElementById('max-tokens-val').textContent=this.value">
       </div>
+    </div>
+
+    <div>
+      <div class="section-label">LLM Sampling</div>
+      <div style="display:flex;flex-direction:column;gap:0.9rem;">
+        <div class="control">
+          <div class="control-header">
+            <label>Temperature</label>
+            <span class="control-value" id="temp-val">0.7</span>
+          </div>
+          <input type="range" id="temp-slider" min="0" max="2" step="0.05" value="0.7"
+                 oninput="document.getElementById('temp-val').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="control">
+          <div class="control-header">
+            <label>Top P</label>
+            <span class="control-value" id="topp-val">0.80</span>
+          </div>
+          <input type="range" id="topp-slider" min="0" max="1" step="0.05" value="0.8"
+                 oninput="document.getElementById('topp-val').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="control">
+          <div class="control-header">
+            <label>Sample Top K</label>
+            <span class="control-value" id="llm-topk-val">20</span>
+          </div>
+          <input type="range" id="llm-topk-slider" min="1" max="100" step="1" value="20"
+                 oninput="document.getElementById('llm-topk-val').textContent=this.value">
+        </div>
+        <div class="control">
+          <div class="control-header">
+            <label>Min P</label>
+            <span class="control-value" id="minp-val">0.00</span>
+          </div>
+          <input type="range" id="minp-slider" min="0" max="1" step="0.05" value="0"
+                 oninput="document.getElementById('minp-val').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+      </div>
+      <p style="margin-top:0.75rem;font-size:0.65rem;color:var(--muted);line-height:1.6;">
+        Context size, threads, GPU, and embedding model are configured by the server administrator.
+      </p>
     </div>
 
     <div>
@@ -867,9 +910,13 @@
     const query = textarea.value.trim();
     if (!query) return;
 
-    const topK     = parseInt(document.getElementById('topk').value);
-    const noLimit  = document.getElementById('no-timeout').checked;
-    const timeout  = noLimit ? null : parseInt(document.getElementById('timeout-slider').value);
+    const topK       = parseInt(document.getElementById('topk').value);
+    const noLimit    = document.getElementById('no-timeout').checked;
+    const timeout    = noLimit ? null : parseInt(document.getElementById('timeout-slider').value);
+    const temperature = parseFloat(document.getElementById('temp-slider').value);
+    const top_p       = parseFloat(document.getElementById('topp-slider').value);
+    const llm_top_k   = parseInt(document.getElementById('llm-topk-slider').value);
+    const min_p       = parseFloat(document.getElementById('minp-slider').value);
 
     textarea.value = '';
     textarea.style.height = 'auto';
@@ -882,7 +929,7 @@
       const res = await fetch('/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, top_k: topK, mode, timeout, max_tokens: parseInt(document.getElementById('max-tokens-slider').value) }),
+        body: JSON.stringify({ query, top_k: topK, mode, timeout, max_tokens: parseInt(document.getElementById('max-tokens-slider').value), temperature, top_p, llm_top_k, min_p }),
       });
 
       const elapsed = removeThinking();

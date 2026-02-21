@@ -110,13 +110,13 @@ fi
 
 # ── Launch ────────────────────────────────────────────────────────────────────
 # If using Docker Compose, use start.bat (Windows) or this script handles native
-if [ -f "docker-compose.yml" ] && [ "$1" = "--docker" ]; then
+if [ -f "docker/docker-compose.yml" ] && [ "$1" = "--docker" ]; then
     # Use GPU compose override if CUDA_AVAILABLE is set
     if grep -q "CUDA_AVAILABLE=true" .env 2>/dev/null; then
-        echo "  GPU mode enabled — using docker-compose.gpu.yml"
-        docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+        echo "  GPU mode enabled — using docker/docker-compose.gpu.yml"
+        docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d --build
     else
-        docker compose up -d --build
+        docker compose -f docker/docker-compose.yml up -d --build
     fi
     echo "Waiting for services to be ready..."
     while ! docker inspect rag_ready --format "{{.State.Status}}" 2>/dev/null | grep -q "exited"; do

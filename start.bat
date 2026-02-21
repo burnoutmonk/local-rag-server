@@ -28,12 +28,12 @@ echo !CUDA_AVAILABLE!>.last_cuda
 :: Choose compose files based on CUDA_AVAILABLE
 if "!CUDA_AVAILABLE!"=="true" (
     echo Starting with GPU support...
-    docker compose -f docker-compose.yml -f docker-compose.gpu.yml build !BUILD_FLAG!
-    docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml build !BUILD_FLAG!
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d
 ) else (
     echo Starting in CPU mode...
-    docker compose build !BUILD_FLAG!
-    docker compose up -d
+    docker compose -f docker/docker-compose.yml build !BUILD_FLAG!
+    docker compose -f docker/docker-compose.yml up -d
 )
 
 if errorlevel 1 (

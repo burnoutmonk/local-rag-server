@@ -25,6 +25,53 @@ PDF / DOCX files
 
 ---
 
+```mermaid
+
+graph TD
+    %% Node Definitions
+    User((User))
+    UI[Web Interface]
+    API[FastAPI Backend]
+    
+    subgraph Storage [Data Storage]
+        Raw[data_raw folder]
+        Qdrant[(Qdrant Vector DB)]
+    end
+
+    subgraph Logic [Processing Engine]
+        Parse[Document Parser]
+        Check{GPU Enabled?}
+        LCpp[llama-cpp-python]
+    end
+
+    %% Flow
+    User -->|1. Manually Place Docs| Raw
+    User -->|2. Set Config| Env[.env]
+    User -->|3. Chat| UI
+    
+    UI <-->|Stream| API
+    API -->|Scan| Raw
+    Raw --> Parse -->|Embed| Qdrant
+    
+    API -->|Fetch Context| Qdrant
+    Qdrant -->|Context| LCpp
+    
+    Env -->|Read| Check
+    Check -->|Yes| GPU[NVIDIA CUDA]
+    Check -->|No| CPU[System CPU]
+    
+    GPU --> LCpp
+    CPU --> LCpp
+    LCpp -->|Response| UI
+
+    %% Styling
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style Qdrant fill:#00d2ff,stroke:#333,stroke-width:2px
+    style GPU fill:#76b900,stroke:#333,stroke-width:2px,color:#fff
+    style UI fill:#fff,stroke:#333,stroke-dasharray: 5 5
+
+```
+
 ## Web UI
 
 Once running, the web UI is accessible at `http://localhost:8000` from the machine running the stack.

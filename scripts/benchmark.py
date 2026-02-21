@@ -10,9 +10,10 @@ import time
 import urllib.request
 from pathlib import Path
 
-LLM_PORT = int(os.environ.get("LLM_PORT", 8080))
-LLM_URL  = os.environ.get("LLM_URL", f"http://rag_llm:{LLM_PORT}/v1/chat/completions")
-ENV_FILE = Path("/app/host_env/.env")
+LLM_PORT    = int(os.environ.get("LLM_PORT", 8080))
+LLM_URL     = os.environ.get("LLM_URL", f"http://rag_llm:{LLM_PORT}/v1/chat/completions")
+ENV_FILE    = Path("/app/host_env/.env")
+MARKER_FILE = Path("/app/host_env/.benchmarked")
 
 PROMPT = "Write a detailed technical explanation of how a CPU processes instructions."
 
@@ -29,7 +30,7 @@ def wait_for_llm(timeout: int = 600) -> None:
         except Exception:
             pass
         print(".", end="", flush=True)
-        time.sleep(2)
+        time.sleep(1)
     print("\nERROR: LLM server did not become ready in time.")
     raise SystemExit(1)
 
@@ -38,7 +39,7 @@ def measure() -> float:
     payload = json.dumps({
         "model": "local",
         "messages": [{"role": "user", "content": PROMPT}],
-        "max_tokens": 150,
+        "max_tokens": 25,
         "temperature": 0.7,
         "stream": False,
     }).encode()
@@ -53,8 +54,9 @@ def measure() -> float:
     with urllib.request.urlopen(req, timeout=300) as r:
         data = json.loads(r.read())
     elapsed = time.time() - start
-    words = len(data["choices"][0]["message"]["content"].split())
-    return round(words / elapsed, 1)
+    tokens = (data.get("usage") or {}).get("completion_tokens") or \
+             len(data["choices"][0]["message"]["content"].split())
+    return round(tokens / elapsed, 1)
 
 
 def update_env(tok_s: float) -> None:
@@ -75,6 +77,12 @@ def main() -> None:
     print("\nLLM Speed Benchmark")
     print("=" * 40)
 
+    if MARKER_FILE.exists():
+        print("  Already benchmarked — skipping.")
+        print("  (Delete .benchmarked from project root to re-run)")
+        print("=" * 40)
+        return
+
     wait_for_llm()
 
     print("Running inference pass...", end="", flush=True)
@@ -82,6 +90,7 @@ def main() -> None:
     print(f" {tok_s} tok/s")
 
     update_env(tok_s)
+    MARKER_FILE.write_text("")
 
     print("=" * 40)
     print(f"  Result: {tok_s} tok/s")
