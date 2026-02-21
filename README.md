@@ -1,4 +1,4 @@
-# Local RAG
+# Local RAG Server
 
 A fully local retrieval-augmented generation (RAG) system for querying PDF and DOCX documents using a local LLM. No cloud, no API keys — just drop in your documents and ask questions.
 
@@ -411,7 +411,6 @@ Returns `{"ok": true}` if the API is running.
 
 - **Retrieval quality:** `top_k=5` is a good default. Increase if answers feel incomplete.
 - **Chunk size:** `MAX_CHARS=1000` works well for most documents. Reduce to 600–700 for documents with many short definitions.
-- **Speed:** Run `python test_speed.py` after startup to measure your actual tok/s and update `TOKENS_PER_SECOND` in your config.
 - **Incremental ingestion:** Only changed or new files are re-ingested. Delete `.ingest_hashes.json` to force a full re-ingest.
 - **Upgrading embeddings:** Swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search for better retrieval quality (requires GPU).
 - **Max response tokens:** Use the slider in the UI to control response length. 500 is a good default — increase for more detailed answers.
