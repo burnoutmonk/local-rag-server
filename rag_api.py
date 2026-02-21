@@ -10,7 +10,7 @@ import threading
 from config import (
     QDRANT_HOST, QDRANT_PORT, COLLECTION,
     EMBED_MODEL_NAME,
-    LLM_URL,
+    LLM_URL, LLM_MODEL_FILE, LLM_GPU_LAYERS,
     LLM_TEMPERATURE, LLM_TOP_P, LLM_TOP_K, LLM_MIN_P,
     TOKENS_PER_SECOND, RETRIEVAL_OVERHEAD_S,
     MIN_TOKENS, MAX_TOKENS,
@@ -75,7 +75,7 @@ def health():
         "gpu_enabled": gpu_enabled,
         "cuda_available": cuda_available,
         "gpu_layers": LLM_GPU_LAYERS,
-        "model": LLM_MODEL_FILE if hasattr(__builtins__, "LLM_MODEL_FILE") else "unknown",
+        "model": LLM_MODEL_FILE,
         "tokens_per_second": TOKENS_PER_SECOND,
     }
 

@@ -1,5 +1,18 @@
 services:
+  model_downloader:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+
   llm:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
     deploy:
       resources:
         reservations:
@@ -7,3 +20,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda

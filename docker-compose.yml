@@ -16,10 +16,7 @@ services:
       start_period: 5s
 
   model_downloader:
-    build:
-      context: .
-      args:
-        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    build: .
     container_name: rag_model_downloader
     command: python3 download_model.py
     volumes:
@@ -30,10 +27,7 @@ services:
     restart: "no"
 
   llm:
-    build:
-      context: .
-      args:
-        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    build: .
     container_name: rag_llm
     command: /llama.cpp/build/bin/llama-server
       --model /models/${LLM_MODEL_FILE}
@@ -52,10 +46,7 @@ services:
     restart: unless-stopped
 
   ingest:
-    build:
-      context: .
-      args:
-        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    build: .
     container_name: rag_ingest
     command: python3 ingest.py
     env_file: .env
@@ -73,10 +64,7 @@ services:
     restart: "no"
 
   api:
-    build:
-      context: .
-      args:
-        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    build: .
     container_name: rag_api
     command: uvicorn rag_api:app --host 0.0.0.0 --port 8000
     env_file: .env

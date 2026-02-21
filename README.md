@@ -189,14 +189,14 @@ Using a GPU massively improves generation speed — expect 100–150 tok/s on a 
 
 ### Windows (Docker — recommended)
 
-1. Install [CUDA Toolkit 12](https://developer.nvidia.com/cuda-downloads) — select Windows → x86_64 → exe (local)
+1. Make sure you have an up to date NVIDIA driver — download from [nvidia.com/drivers](https://www.nvidia.com/Download/index.aspx)
 2. Verify: open CMD and run `nvidia-smi`
 3. Set in `.env`:
 ```env
 CUDA_AVAILABLE=true
 LLM_GPU_LAYERS=-1
 ```
-4. Run `start.bat` — it automatically uses the GPU compose override
+4. Run `start.bat` — Docker pulls the CUDA 12 toolkit automatically inside the container, no local CUDA install needed
 
 ---
 
