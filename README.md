@@ -2,6 +2,8 @@
 
 A fully local retrieval-augmented generation (RAG) system for querying PDF and DOCX documents using a local LLM. No cloud, no API keys — just drop in your documents and ask questions.
 
+> **v2.1.0** — Analytics sidebar, live tok/s tracking, max response tokens slider, GPU/CPU status badge
+
 ```
 PDF / DOCX files
       |
@@ -301,6 +303,10 @@ curl -X POST http://localhost:8000/answer \
   -d '{"query": "what is X", "top_k": 5, "mode": "search"}'
 ```
 
+### `GET /metrics`
+
+Returns per-query analytics history for the current session (tok/s, prompt tokens, response tokens, response time).
+
 ### `GET /health`
 Returns `{"ok": true}` if the API is running.
 
@@ -340,6 +346,9 @@ Returns `{"ok": true}` if the API is running.
 - **Speed:** Run `python test_speed.py` after startup to measure your actual tok/s and update `TOKENS_PER_SECOND` in your config.
 - **Incremental ingestion:** Only changed or new files are re-ingested. Delete `.ingest_hashes.json` to force a full re-ingest.
 - **Upgrading embeddings:** Swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search for better retrieval quality (requires GPU).
+- **Max response tokens:** Use the slider in the UI to control response length. 500 is a good default — increase for more detailed answers.
+- **Analytics:** The sidebar tracks tok/s, prompt/response token counts, and average response time per session. Resets on container restart.
+- **GPU toggle:** Set `LLM_GPU_LAYERS=-1` or `0` in `.env` and restart — no rebuild needed to switch GPU on/off.
 
 ---
 
