@@ -23,7 +23,9 @@ from config import (
 )
 
 DATA_DIR  = Path(__file__).resolve().parent / "data_raw"
-HASH_FILE = Path(__file__).resolve().parent / ".ingest_hashes.json"
+# Store hash file in /app/state if it exists (Docker volume), otherwise next to ingest.py
+_STATE_DIR = Path("/app/state") if Path("/app/state").exists() else Path(__file__).resolve().parent
+HASH_FILE = _STATE_DIR / ".ingest_hashes.json"
 
 
 # ── File hashing ──────────────────────────────────────────────────────────────
@@ -37,8 +39,13 @@ def file_hash(path: Path) -> str:
 
 
 def load_hashes() -> dict:
-    if HASH_FILE.exists():
-        return json.loads(HASH_FILE.read_text())
+    try:
+        if HASH_FILE.exists() and HASH_FILE.is_file():
+            text = HASH_FILE.read_text().strip()
+            if text:
+                return json.loads(text)
+    except Exception:
+        pass
     return {}
 
 

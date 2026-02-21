@@ -67,7 +67,17 @@ def home(request: Request):
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    import shutil
+    gpu_enabled = LLM_GPU_LAYERS != 0
+    cuda_available = shutil.which("nvidia-smi") is not None
+    return {
+        "ok": True,
+        "gpu_enabled": gpu_enabled,
+        "cuda_available": cuda_available,
+        "gpu_layers": LLM_GPU_LAYERS,
+        "model": LLM_MODEL_FILE if hasattr(__builtins__, "LLM_MODEL_FILE") else "unknown",
+        "tokens_per_second": TOKENS_PER_SECOND,
+    }
 
 
 @app.post("/search")

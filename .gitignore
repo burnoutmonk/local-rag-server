@@ -30,3 +30,7 @@ Thumbs.db
 
 # Ingest state
 .ingest_hashes.json
+
+# Docker
+.env
+!.env.example

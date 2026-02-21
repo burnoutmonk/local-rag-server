@@ -17,6 +17,23 @@ LLAMA_BIN="$LLAMA_DIR/build/bin/llama-server"
 
 cd "$SCRIPT_DIR"
 
+# ── Check for conflicting Docker Compose stack ────────────────────────────────
+if docker ps --format "{{.Names}}" 2>/dev/null | grep -qE "rag_api|rag_llm|rag_ingest"; then
+    echo "ERROR: Docker Compose stack appears to be already running."
+    echo "  Stop it first with: docker compose down"
+    echo "  Then run: ./run.sh"
+    exit 1
+fi
+
+# ── Check for conflicting Qdrant container ────────────────────────────────────
+if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^qdrant$"; then
+    echo "WARNING: A Qdrant container is already running on port 6333."
+    echo "  This may have been started by a previous Docker Compose run."
+    echo "  Stop it with: docker stop qdrant && docker rm qdrant"
+    echo "  Then run: ./run.sh"
+    exit 1
+fi
+
 # ── Python venv ───────────────────────────────────────────────────────────────
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment..."
@@ -92,4 +109,21 @@ if command -v nvcc &> /dev/null; then
 fi
 
 # ── Launch ────────────────────────────────────────────────────────────────────
-python start.py "$@"
+# If using Docker Compose, use start.bat (Windows) or this script handles native
+if [ -f "docker-compose.yml" ] && [ "$1" = "--docker" ]; then
+    # Use GPU compose override if CUDA_AVAILABLE is set
+    if grep -q "CUDA_AVAILABLE=true" .env 2>/dev/null; then
+        echo "  GPU mode enabled — using docker-compose.gpu.yml"
+        docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    else
+        docker compose up -d
+    fi
+    echo "Waiting for services to be ready..."
+    while ! docker inspect rag_ready --format "{{.State.Status}}" 2>/dev/null | grep -q "exited"; do
+        sleep 2
+    done
+    echo "Opening browser..."
+    xdg-open http://localhost:8000 2>/dev/null || open http://localhost:8000 2>/dev/null || echo "Open your browser at: http://localhost:8000"
+else
+    python start.py "$@"
+fi

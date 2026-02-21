@@ -407,7 +407,7 @@
 <header>
   <div class="logo">local<span>/</span>rag</div>
   <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
-    <div class="status-dot" id="status-dot"></div>
+    <span id="gpu-badge" style="font-family:var(--mono);font-size:0.72rem;margin-right:0.75rem;cursor:default;color:var(--muted)" title="Checking..."></span><div class="status-dot" id="status-dot"></div>
     <span class="status-label" id="status-label">checking...</span>
   </div>
 </header>
@@ -498,8 +498,21 @@
     try {
       const r = await fetch('/health');
       if (r.ok) {
+        const data = await r.json();
         document.getElementById('status-dot').classList.add('online');
         document.getElementById('status-label').textContent = 'online';
+        const badge = document.getElementById('gpu-badge');
+        if (badge) {
+          if (data.gpu_enabled && data.cuda_available) {
+            badge.textContent = '⚡ GPU';
+            badge.style.color = 'var(--success)';
+            badge.title = `CUDA enabled · ${data.gpu_layers} layers · ${data.tokens_per_second} tok/s`;
+          } else {
+            badge.textContent = '🖥 CPU';
+            badge.style.color = 'var(--muted)';
+            badge.title = `CPU only · ${data.tokens_per_second} tok/s`;
+          }
+        }
       }
     } catch {
       document.getElementById('status-label').textContent = 'offline';

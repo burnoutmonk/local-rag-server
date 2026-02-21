@@ -1,168 +1,245 @@
-# Local RAG — PDF/DOCX Question Answering over a Local LLM
+# Local RAG
 
-A lightweight, fully local retrieval-augmented generation (RAG) system. Drop in your PDF and DOCX files, run two commands, and ask questions through a browser UI. No cloud services, no API keys.
-
-## Architecture
+A fully local retrieval-augmented generation (RAG) system for querying PDF and DOCX documents using a local LLM. No cloud, no API keys — just drop in your documents and ask questions.
 
 ```
 PDF / DOCX files
       |
       v
- Text extraction & cleaning (pypdf, python-docx)
+ Text extraction & cleaning
       |
       v
  Chunking (overlapping, paragraph-aware)
       |
       v
- all-MiniLM-L6-v2 embeddings (384-dim, fast on CPU)
+ all-MiniLM-L6-v2 embeddings (384-dim, CPU friendly)
       |
       v
  Qdrant (local vector store)
       |
       v
- FastAPI retrieval API  <--  llama.cpp (local LLM, OpenAI-compatible)
-      |
-      v
- Browser UI
+ FastAPI + llama.cpp  →  Browser UI
 ```
+
+---
+
+## Platform Support
+
+| Platform | Docker | Native |
+|---|---|---|
+| Linux | ✅ `./run.sh --docker` | ✅ `./run.sh` |
+| macOS | ✅ `./run.sh --docker` | ✅ `./run.sh` |
+| Windows | ✅ `start.bat` | ⚠️ WSL2 only |
+
+**Windows users:** Just install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and double-click `start.bat` — no WSL2, Python, or manual setup needed.
+
+**Linux/macOS native:** Requires Docker only for Qdrant. Everything else runs directly on your machine via `./run.sh`.
 
 ---
 
 ## GPU Acceleration
 
-Using a GPU dramatically improves generation speed:
-
-| Hardware | Expected Speed | Notes |
-|---|---|---|
-| CPU only (4-8B model) | 3–15 tok/s | Default, works everywhere |
-| NVIDIA GPU (4070 Ti) | 100–150 tok/s | Requires CUDA setup |
-| NVIDIA GPU (3090/4090) | 150–200 tok/s | Requires CUDA setup |
-
-### Enabling GPU on Linux
-
-1. Make sure your NVIDIA drivers are installed: `nvidia-smi` should show your GPU
-2. Install CUDA toolkit:
-```bash
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_amd64.deb
-sudo dpkg -i cuda-keyring_1.1-1_amd64.deb
-sudo apt update
-sudo apt install cuda-toolkit-12-6
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-source ~/.bashrc
-```
-3. Verify with `nvcc --version`
-4. Run `./run.sh` — it will automatically detect CUDA and build llama.cpp with GPU support
-
-### Enabling GPU on WSL2
-
-1. Install the [NVIDIA WSL2 driver](https://developer.nvidia.com/cuda/wsl) on **Windows** (not inside WSL)
-2. Verify your GPU is visible inside WSL: `nvidia-smi`
-3. Follow the same CUDA toolkit steps as Linux above
-4. Run `./run.sh`
-
-### Enabling GPU in config.py
-
-After setting up CUDA, update `config.py`:
-```python
-LLM_GPU_LAYERS = -1      # -1 = offload all layers to GPU
-LLM_CONTEXT = 32768      # GPU can handle larger context windows
-```
-
-If llama.cpp was already built without CUDA, delete the build and rerun:
-```bash
-rm -rf llama.cpp/build
-./run.sh
-```
-
-## Platform Support
-
-| Platform | Supported |
+| Hardware | Expected Speed |
 |---|---|
-| Linux | ✅ Native |
-| macOS | ✅ Native |
-| Windows | ⚠️ Use WSL2 |
+| CPU only (4-8B model) | 3–15 tok/s |
+| NVIDIA GPU (4070 Ti) | 100–150 tok/s |
+| NVIDIA GPU (3090/4090) | 150–200 tok/s |
 
-**Windows users:** This project is designed for Linux/macOS. On Windows, install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the same instructions inside a WSL terminal. WSL2 gives you a full Linux environment and is the recommended setup for local LLM work on Windows anyway.
+GPU setup instructions are in the [Enabling GPU](#enabling-gpu) section below.
+
+---
 
 ## Requirements
 
 - Python 3.10+
-- Docker (for Qdrant)
-- Git, CMake, and a C++ compiler (to build llama.cpp)
+- Docker
+- Git, CMake, and a C++ compiler (native workflow only)
 
 On Ubuntu:
 ```bash
-sudo apt install build-essential cmake git docker.io python3-venv
+sudo apt install build-essential cmake git docker.io python3-venv python3-full
+sudo usermod -aG docker $USER && newgrp docker
 ```
-
-Any GGUF model works. For good CPU-friendly options try [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF) or [Phi-3-mini](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf).
-
-`run.sh` will automatically clone and build llama.cpp if it is not already installed. Qdrant is started automatically via Docker.
 
 ---
 
-## Installation
+## Quick Start
+
+### 1. Clone the repo
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/burnoutmonk/local_rag.git
+cd local_rag
 ```
-
----
-
-## Usage
-
-### 1. Configure
-
-Edit `config.py` and set at minimum:
-- `LLM_MODEL_PATH` — path to your `.gguf` model file
-- `LLM_THREADS` — number of CPU cores to use
-- `LLM_CONTEXT` — context window size (check your model's specs)
 
 ### 2. Add your documents
 
 Place PDF and DOCX files in the `data_raw/` folder.
 
-### 3. Start everything
+### 3. Configure
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set at minimum:
+- `LLM_MODEL_FILE` — filename of your GGUF model (downloaded automatically)
+- `LLM_MODEL_REPO` — HuggingFace repo to download from
+- `LLM_THREADS` — number of CPU cores to use
+- `LLM_GPU_LAYERS` — set to `-1` to use GPU, `0` for CPU only
+
+### 4. Start everything
+
+---
+
+#### Option A — Docker Compose ✅ Recommended
+
+No manual setup required. Docker handles everything — Python, llama.cpp, Qdrant, ingestion, and the web UI.
+
+```bash
+docker compose up -d
+```
+
+Then open `http://localhost:8000`.
+
+To stop:
+```bash
+docker compose down
+```
+
+To view logs:
+```bash
+docker compose logs -f
+```
+
+---
+
+#### Option B — Native (Linux/macOS/WSL2)
+
+Runs everything directly on your machine. Easier to debug and faster iteration.
 
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-This will automatically:
-1. Create a Python virtual environment
-2. Install all dependencies
-3. Download the model from HuggingFace (if not already present)
-4. Start Qdrant via Docker
-5. Ingest all documents from `data_raw/`
-6. Start the llama.cpp LLM server
-7. Start the web UI at `http://localhost:8000`
+This automatically:
+1. Creates a Python virtual environment and installs dependencies
+2. Builds llama.cpp from source (first run only — takes 10–20 minutes)
+3. Downloads the model from HuggingFace
+4. Starts Qdrant via Docker
+5. Ingests documents from `data_raw/`
+6. Starts the web UI at `http://localhost:8000`
 
 Press `Ctrl+C` to stop all services.
 
-### Useful flags
-
+Useful flags:
 ```bash
 ./run.sh --skip-ingest   # skip ingestion if documents haven't changed
-./run.sh --skip-llm      # skip LLM server if it's already running
+./run.sh --skip-llm      # skip LLM server if already running
 ```
 
 ---
 
 ## Configuration
 
-All settings are at the top of each file:
+All settings live in `config.py` (native) and `.env` (Docker). They share the same values — environment variables in `.env` override the defaults in `config.py`.
 
-| Variable | File | Description |
+| Setting | Default | Description |
 |---|---|---|
-| `EMBED_MODEL_NAME` | `ingest.py`, `rag_api.py` | Embedding model (default: MiniLM-L6-v2) |
-| `MAX_CHARS` | `ingest.py` | Max chars per chunk (default: 1000) |
-| `OVERLAP_CHARS` | `ingest.py` | Overlap between chunks (default: 100) |
-| `LLM_URL` | `rag_api.py` | llama.cpp server endpoint |
-| `TOKENS_PER_SECOND` | `rag_api.py` | Tune to your hardware for timeout estimation |
-| `MAX_TOKENS` | `rag_api.py` | Max LLM output tokens (default: 500) |
-| `COLLECTION` | both | Qdrant collection name |
+| `LLM_MODEL_FILE` | `qwen2.5-3b-instruct-q4_k_m.gguf` | GGUF model filename |
+| `LLM_MODEL_REPO` | `Qwen/Qwen2.5-3B-Instruct-GGUF` | HuggingFace repo |
+| `LLM_THREADS` | `8` | CPU threads for inference |
+| `LLM_CONTEXT` | `4096` | Context window size |
+| `LLM_GPU_LAYERS` | `0` | GPU layers (`-1` = all, `0` = CPU only) |
+| `MAX_TOKENS` | `500` | Max output tokens |
+| `TOKENS_PER_SECOND` | `10.0` | Your hardware speed (run `test_speed.py`) |
+| `MAX_CHARS` | `1000` | Max chars per chunk |
+| `OVERLAP_CHARS` | `100` | Chunk overlap |
+
+---
+
+## Enabling GPU
+
+### Native (run.sh)
+
+1. Install CUDA toolkit:
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_amd64.deb
+sudo dpkg -i cuda-keyring_1.1-1_amd64.deb
+sudo apt update && sudo apt install cuda-toolkit-12-6
+echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+2. Verify: `nvcc --version`
+3. Delete old build and rerun: `rm -rf llama.cpp/build && ./run.sh`
+4. Set in `config.py`: `LLM_GPU_LAYERS = -1`
+
+### Docker
+
+1. Set in `.env`:
+```env
+CUDA_AVAILABLE=true
+LLM_GPU_LAYERS=-1
+```
+2. Uncomment the `deploy` section in `docker-compose.yml`
+3. Rebuild and restart:
+```bash
+docker compose build
+docker compose up -d
+```
+
+### WSL2
+
+1. Install the [NVIDIA WSL2 driver](https://developer.nvidia.com/cuda/wsl) on **Windows**
+2. Verify GPU is visible inside WSL: `nvidia-smi`
+3. Follow the native CUDA steps above
+
+---
+
+## Managing the Docker Stack
+
+### Common operations
+
+```bash
+docker compose up -d        # start all services
+docker compose down         # stop all services
+docker compose logs -f      # follow logs from all services
+docker compose logs -f api  # follow logs from a specific service
+```
+
+### When to rebuild
+
+Most changes do NOT require a rebuild — just restart:
+
+```bash
+docker compose up -d   # picks up .env changes automatically
+```
+
+| Change | Command |
+|---|---|
+| `.env` parameters (tokens, threads, context) | `docker compose up -d` |
+| New model | update `.env`, then `docker compose up -d` |
+| Python code changes | `docker compose build api && docker compose up -d` |
+| Switch CPU → GPU | update `.env`, then `docker compose build && docker compose up -d` |
+| Update llama.cpp | `docker compose build llm && docker compose up -d` |
+
+### Switching models
+
+1. Edit `.env` and set the new `LLM_MODEL_FILE` and `LLM_MODEL_REPO`
+2. Run `docker compose up -d`
+3. `model_downloader` will automatically fetch the new model if it isn't in `models/` already
+
+### Re-ingesting documents
+
+If you add or change documents in `data_raw/`:
+
+```bash
+docker compose run --rm ingest
+```
+
+This runs ingestion once and exits. Only changed or new files are re-ingested thanks to hash tracking.
 
 ---
 
@@ -170,16 +247,14 @@ All settings are at the top of each file:
 
 ### `POST /answer`
 Retrieves relevant chunks and generates an answer with the LLM.
-
 ```bash
 curl -X POST http://localhost:8000/answer \
   -H "Content-Type: application/json" \
   -d '{"query": "what is X", "top_k": 5, "mode": "answer", "timeout": 60}'
 ```
 
-### `POST /search`
-Returns raw retrieved chunks without calling the LLM. Useful for debugging retrieval quality.
-
+### `POST /answer` (search mode)
+Returns raw retrieved chunks without calling the LLM. Useful for debugging retrieval.
 ```bash
 curl -X POST http://localhost:8000/answer \
   -H "Content-Type: application/json" \
@@ -195,15 +270,21 @@ Returns `{"ok": true}` if the API is running.
 
 ```
 .
-|-- data_raw/          # Place your PDF and DOCX files here
+|-- data_raw/              # Place your PDF and DOCX files here
+|-- models/                # GGUF model downloaded here automatically
 |-- templates/
-|   `-- index.html     # Browser UI
-|-- config.py          # All settings — edit this first
-|-- run.sh             # Entry point: creates venv, installs deps, runs start.py
-|-- start.py           # Main launcher (Qdrant + LLM + web UI)
-|-- ingest.py          # Parse, chunk, embed, and upsert into Qdrant
-|-- rag_api.py         # FastAPI retrieval + LLM answer API
-`-- requirements.txt
+|   └-- index.html         # Browser UI
+|-- config.py              # All settings (native workflow)
+|-- .env.example           # All settings (Docker workflow) — copy to .env
+|-- run.sh                 # Native entry point
+|-- start.py               # Native launcher (Qdrant + LLM + web UI)
+|-- ingest.py              # Parse, chunk, embed, and upsert into Qdrant
+|-- rag_api.py             # FastAPI retrieval + LLM answer API
+|-- download_model.py      # Model downloader (used by Docker)
+|-- test_speed.py          # Measure your LLM's tok/s
+|-- Dockerfile             # Docker image for Python services
+|-- docker-compose.yml     # Full stack orchestration
+└-- requirements.txt
 ```
 
 ---
@@ -211,7 +292,13 @@ Returns `{"ok": true}` if the API is running.
 ## Tips
 
 - **Retrieval quality:** `top_k=5` is a good default. Increase if answers feel incomplete.
-- **Speed:** MiniLM embeds ~1000 chunks/min on CPU. Ingestion is a one-time cost.
-- **Chunk size:** `MAX_CHARS=1000` works well for most documents. Reduce to 600-700 for documents with many short definitions.
-- **PDF cleaning:** `clean_pdf_text()` in `ingest.py` strips page numbers, TOC lines, and copyright watermarks automatically. Add custom rules for your document patterns.
-- **Upgrading embeddings:** For better retrieval quality at the cost of needing a GPU, swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search with Qdrant.
+- **Chunk size:** `MAX_CHARS=1000` works well for most documents. Reduce to 600–700 for documents with many short definitions.
+- **Speed:** Run `python test_speed.py` after startup to measure your actual tok/s and update `TOKENS_PER_SECOND` in your config.
+- **Incremental ingestion:** Only changed or new files are re-ingested. Delete `.ingest_hashes.json` to force a full re-ingest.
+- **Upgrading embeddings:** Swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search for better retrieval quality (requires GPU).
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)

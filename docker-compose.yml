@@ -1,0 +1,149 @@
+services:
+
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' 2>/dev/null && exit 0 || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  model_downloader:
+    build:
+      context: .
+      args:
+        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    container_name: rag_model_downloader
+    command: python3 download_model.py
+    volumes:
+      - ./models:/models
+    environment:
+      - LLM_MODEL_FILE=${LLM_MODEL_FILE}
+      - LLM_MODEL_REPO=${LLM_MODEL_REPO}
+    restart: "no"
+
+  llm:
+    build:
+      context: .
+      args:
+        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    container_name: rag_llm
+    command: /llama.cpp/build/bin/llama-server
+      --model /models/${LLM_MODEL_FILE}
+      --host 0.0.0.0
+      --port 8080
+      --ctx-size ${LLM_CONTEXT:-4096}
+      --threads ${LLM_THREADS:-8}
+      --n-gpu-layers ${LLM_GPU_LAYERS:-0}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models
+    depends_on:
+      model_downloader:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ingest:
+    build:
+      context: .
+      args:
+        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    container_name: rag_ingest
+    command: python3 ingest.py
+    env_file: .env
+    environment:
+      - QDRANT_HOST=qdrant
+    volumes:
+      - ./data_raw:/app/data_raw
+      - ./models:/app/models
+      - ingest_state:/app/state
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      model_downloader:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      args:
+        - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+    container_name: rag_api
+    command: uvicorn rag_api:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment:
+      - QDRANT_HOST=qdrant
+      - LLM_URL=http://rag_llm:8080/v1/chat/completions
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ingest:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8000' 2>/dev/null && exit 0 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  benchmark:
+    build: .
+    container_name: rag_benchmark
+    command: python3 benchmark.py
+    volumes:
+      - .:/app/host_env  # mount project dir so benchmark can update .env
+    environment:
+      - LLM_URL=http://rag_llm:8080/v1/chat/completions
+      - LLM_PORT=8080
+    depends_on:
+      llm:
+        condition: service_started
+    restart: "no"
+
+  ready:
+    image: bash
+    container_name: rag_ready
+    depends_on:
+      api:
+        condition: service_healthy
+      benchmark:
+        condition: service_completed_successfully
+    command: >
+      bash -c "
+        echo '';
+        echo '========================================';
+        echo '   Local RAG is ready!';
+        echo '========================================';
+        echo '';
+        echo '   Open your browser at:';
+        echo '   http://localhost:8000';
+        echo '';
+        if [ "$CUDA_AVAILABLE" = "true" ] && [ "$LLM_GPU_LAYERS" != "0" ]; then
+          echo '   GPU: CUDA enabled';
+        else
+          echo '   GPU: CPU only';
+        fi;
+        echo '   To stop: docker compose down';
+        echo '========================================';
+        echo '';
+      "
+    environment:
+      - CUDA_AVAILABLE=${CUDA_AVAILABLE:-false}
+      - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:-0}
+    restart: "no"
+
+volumes:
+  qdrant_storage:
+  ingest_state:
