@@ -8,6 +8,20 @@
 #   chmod +x run.sh
 #   ./run.sh [--skip-ingest] [--skip-llm]
 
+if [ -f .env ]; then
+    # Removes comments and exports each line
+    export $(grep -v '^#' .env | xargs)
+    echo "✅ Environment variables loaded from .env"
+else
+    echo "❌ Error: .env file not found."
+    exit 1
+fi
+
+Diagnostic check to ensure GPU is ready
+if [ "$CUDA_AVAILABLE" = "true" ]; then
+    echo "🚀 Launching with GPU Layers: $LLM_GPU_LAYERS"
+fi
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

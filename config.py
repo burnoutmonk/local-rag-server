@@ -39,8 +39,8 @@ LLM_URL = env("LLM_URL", "http://localhost:8080/v1/chat/completions")
 LLM_MODEL_PATH = env("LLM_MODEL_PATH", "models/Llama-3.2-3B-Instruct-Q4_K_M.gguf")
 
 # HuggingFace repo and filename to download if model doesn't exist
-LLM_MODEL_REPO = "bartowski/Llama-3.2-3B-Instruct-GGUF"
-LLM_MODEL_FILE = "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+LLM_MODEL_REPO = env("LLM_MODEL_REPO", "bartowski/Llama-3.2-3B-Instruct-GGUF")
+LLM_MODEL_FILE = env("LLM_MODEL_FILE", "Llama-3.2-3B-Instruct-Q4_K_M.gguf")
 
 # llama.cpp server settings
 # If llama-server is not on your PATH, set the full path here.
