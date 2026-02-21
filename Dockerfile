@@ -7,9 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN echo ">>> Building llama.cpp: CPU only <<<"
 RUN git clone https://github.com/ggerganov/llama.cpp /llama.cpp --depth=1 \
-    && cmake -B /llama.cpp/build -S /llama.cpp -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    && cmake -B /llama.cpp/build -S /llama.cpp -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
     && cmake --build /llama.cpp/build --config Release -j$(nproc)
 RUN echo ">>> llama.cpp CPU build complete <<<"
+RUN test -f /llama.cpp/build/bin/llama-server || (echo "ERROR: llama-server was not built!" && exit 1)
 
 WORKDIR /app
 
