@@ -98,7 +98,7 @@ Use a reverse proxy like [Caddy](https://caddyserver.com/) or [nginx](https://ng
 | Platform | Docker | Native |
 |---|---|---|
 | Linux | ✅ `./run.sh --docker` | ✅ `./run.sh` |
-| macOS | ✅ `./run.sh --docker` | ✅ `./run.sh` |
+| macOS | ⚠️ (not tested) `./run.sh --docker` | ⚠️ (not tested) `./run.sh` |
 | Windows | ✅ `start.bat` | ⚠️ WSL2 only |
 
 **Windows users:** Just install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and double-click `start.bat` — no WSL2, Python, or manual setup needed.
