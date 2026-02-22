@@ -10,6 +10,13 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   llm:
     build:

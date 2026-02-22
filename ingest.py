@@ -12,6 +12,10 @@ from tqdm import tqdm
 from pypdf import PdfReader
 import docx
 
+import torch
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
@@ -21,7 +25,7 @@ from config import (
     MAX_CHARS, OVERLAP_CHARS, BATCH_SIZE,
 )
 
-DATA_DIR  = Path(__file__).resolve().parent / "data_raw"
+DATA_DIR = Path(__file__).resolve().parent / "data_raw"
 # Store hash file in /app/state if it exists (Docker volume), otherwise next to ingest.py
 _STATE_DIR = Path("/app/state") if Path("/app/state").exists() else Path(__file__).resolve().parent
 HASH_FILE = _STATE_DIR / ".ingest_hashes.json"
@@ -137,16 +141,17 @@ def read_pdf_sections(path: Path) -> List[Tuple[str, str]]:
     total_pages = len(reader.pages)
     out: List[Tuple[str, str]] = []
     for i, page in enumerate(reader.pages):
-        print(f"    reading page {i+1}/{total_pages} ...", end="\r", flush=True)
+        # per-page prints will be interleaved under multiprocessing but still usable
+        print(f"    [{path.name}] reading page {i+1}/{total_pages} ...", end="\r", flush=True)
         try:
             raw = normalize_text(page.extract_text() or "")
             text = clean_pdf_text(raw)
         except Exception as exc:
-            print(f"    WARNING: page {i+1} failed ({exc}) -- skipping")
+            print(f"    WARNING: page {i+1} of {path.name} failed ({exc}) -- skipping")
             continue
         if text:
             out.append((f"Page {i+1}", text))
-    print(f"    -> {len(out)}/{total_pages} pages with text    ")
+    print(f"    [{path.name}] -> {len(out)}/{total_pages} pages with text    ")
     return out
 
 
@@ -161,7 +166,7 @@ def read_docx_sections(path: Path) -> List[Tuple[str, str]]:
         try:
             txt = normalize_text(p.text)
         except Exception as exc:
-            print(f"    WARNING: paragraph parse failed ({exc}) -- skipping")
+            print(f"    WARNING: paragraph parse failed in {path.name} ({exc}) -- skipping")
             continue
         if not txt:
             continue
@@ -177,12 +182,55 @@ def read_docx_sections(path: Path) -> List[Tuple[str, str]]:
         sections.append((current_title, current_lines))
 
     result = [(title, "\n".join(lines)) for title, lines in sections]
-    print(f"    -> {len(result)} sections found")
+    print(f"    [{path.name}] -> {len(result)} sections found")
     return result
+
+
+# ── Worker function for multiprocessing ───────────────────────────────────────
+def process_file_for_chunks(path_str: str):
+    """
+    Worker: read a single file, split into sections, chunk text,
+    and build payloads + texts for that file.
+
+    Returns:
+        (filename, n_sections, n_chunks, payloads, texts, elapsed_seconds)
+    """
+    path = Path(path_str)
+    t0 = time.time()
+
+    if path.suffix.lower() == ".pdf":
+        sections = read_pdf_sections(path)
+    else:
+        sections = read_docx_sections(path)
+
+    doc_id = path.stem
+    payloads = []
+    texts = []
+    file_chunks = 0
+
+    for s_idx, (section_title, section_text) in enumerate(sections):
+        chunks = chunk_text(section_text)
+        file_chunks += len(chunks)
+        for idx, chunk in enumerate(chunks):
+            payloads.append({
+                "doc_id": doc_id,
+                "source_file": path.name,
+                "section": section_title,
+                "chunk_index": idx,
+                "text": chunk,
+            })
+            texts.append(chunk)
+
+    elapsed = time.time() - t0
+    return path.name, len(sections), file_chunks, payloads, texts, elapsed
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
+
+    print("\n CUDA available:", torch.cuda.is_available())
+    print("\n Device count:", torch.cuda.device_count())
+
     total_start = time.time()
 
     if not DATA_DIR.exists():
@@ -221,7 +269,7 @@ def main() -> None:
         stored_hashes = {}
 
     new_hashes = {}
-    files_to_ingest = []
+    files_to_ingest: List[Path] = []
 
     for f in files:
         h = file_hash(f)
@@ -255,7 +303,7 @@ def main() -> None:
     print(f"[3/4] Loading embedding model: {EMBED_MODEL_NAME} ...")
     t0 = time.time()
     from sentence_transformers import SentenceTransformer
-    embedder = SentenceTransformer(EMBED_MODEL_NAME)
+    embedder = SentenceTransformer(EMBED_MODEL_NAME, device="cuda" if torch.cuda.is_available() else "cpu")
     dim = embedder.get_sentence_embedding_dimension()
     print(f"      Model loaded in {time.time()-t0:.1f}s  (dim={dim})\n")
 
@@ -269,15 +317,10 @@ def main() -> None:
 
     # Step 4: Parse, chunk & embed changed files
     print(f"[4/4] Parsing, chunking and embedding ...")
-    all_payloads = []
-    all_texts = []
-    t0 = time.time()
 
-    for file_idx, f in enumerate(files_to_ingest, 1):
-        file_start = time.time()
-        print(f"\n  [{file_idx}/{len(files_to_ingest)}] {f.name}")
-
-        # Remove old chunks for this file before re-adding
+    # 4a) Remove old chunks for these files (single-threaded, cheap vs embedding)
+    for f in files_to_ingest:
+        print(f"  Deleting old chunks for {f.name} ...")
         client.delete(
             collection_name=COLLECTION,
             points_selector=Filter(
@@ -285,30 +328,34 @@ def main() -> None:
             ),
         )
 
-        sections = read_pdf_sections(f) if f.suffix.lower() == ".pdf" else read_docx_sections(f)
-        doc_id = f.stem
-        file_chunks = 0
+    # 4b) Process files in parallel (parsing + chunking)
+    t0 = time.time()
+    all_payloads = []
+    all_texts = []
 
-        for s_idx, (section_title, section_text) in enumerate(sections):
-            print(f"    chunking section {s_idx+1}/{len(sections)}: '{section_title[:50]}' ...", end="\r", flush=True)
-            chunks = chunk_text(section_text)
-            file_chunks += len(chunks)
-            for idx, chunk in enumerate(chunks):
-                all_payloads.append({
-                    "doc_id": doc_id,
-                    "source_file": f.name,
-                    "section": section_title,
-                    "chunk_index": idx,
-                    "text": chunk,
-                })
-                all_texts.append(chunk)
+    max_workers = os.cpu_count() or 4
+    print(f"\n  Using up to {max_workers} worker processes for parsing/chunking.\n")
 
-        print(f"    -> {len(sections)} section(s), {file_chunks} chunk(s)  ({time.time()-file_start:.1f}s)    ")
+    with ProcessPoolExecutor(max_workers=max_workers) as ex:
+        futures = {
+            ex.submit(process_file_for_chunks, str(f)): f.name
+            for f in files_to_ingest
+        }
+
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="  Processing files"):
+            fname, n_sections, n_chunks, payloads, texts, elapsed = fut.result()
+            print(f"  [{fname}] -> {n_sections} section(s), {n_chunks} chunk(s)  ({elapsed:.1f}s)")
+            all_payloads.extend(payloads)
+            all_texts.extend(texts)
 
     total_chars = sum(len(t) for t in all_texts)
     print(f"\n  Chunking done in {time.time()-t0:.1f}s")
-    print(f"  Total: {len(all_texts)} chunks  |  ~{total_chars/1000:.0f}k chars  |  avg {total_chars//max(len(all_texts),1)} chars/chunk\n")
+    print(
+        f"  Total: {len(all_texts)} chunks  |  ~{total_chars/1000:.0f}k chars  "
+        f"|  avg {total_chars//max(len(all_texts),1)} chars/chunk\n"
+    )
 
+    # 4c) Embedding (GPU/CPU, but single process)
     print(f"  Embedding {len(all_texts)} chunks ...")
     t0 = time.time()
     vectors = embedder.encode(
@@ -316,6 +363,7 @@ def main() -> None:
         batch_size=BATCH_SIZE,
         show_progress_bar=True,
         normalize_embeddings=True,
+        device="cuda" if torch.cuda.is_available() else "cpu",
     )
 
     print(f"  Embedded in {time.time()-t0:.1f}s\n  Upserting ...")
