@@ -548,22 +548,10 @@ The script:
 - Saves results to `test_results.json`
 
 **Sample output:**
-```
-══════════════════════════════════════════════════════════
-RAG Accuracy Test Report
-══════════════════════════════════════════════════════════
-Questions tested:    20
-Unique source files: 8
 
-Search Mode       Retrieval %   Answer %   Avg Time (s)
-─────────────────────────────────────────────────────────
-Dense               80.0%        70.0%       1.1
-Hybrid              90.0%        80.0%       1.4
-Hybrid+Rerank       95.0%        88.0%       3.2
-══════════════════════════════════════════════════════════
-```
+![RAG Accuracy Test Results](docs/test_results.png)
 
-**Note:** The test must run against a running stack (start with `start.bat` or `run.sh --docker` first).
+**Note:** The test must run against a running stack (start with `start.bat` or `run.sh --docker` first). Scores depend heavily on your documents, model, and settings — the screenshot above shows a real test run on sample documents.
 
 ---
 
