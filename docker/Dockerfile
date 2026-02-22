@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 COPY config.py ingest.py rag_api.py download_model.py ./
 COPY scripts/benchmark.py benchmark.py
+COPY scripts/ scripts/
 COPY templates/ templates/
 
 EXPOSE 8000 8080

@@ -167,7 +167,9 @@ services:
       dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_test
-    command: python3 scripts/rag_test.py --questions 20 --top-k 5
+    # Script is at /app/scripts/rag_test.py (copied by Dockerfile)
+    # Output goes to /app/project/ which is mounted to the project root on host
+    command: python3 /app/scripts/rag_test.py --questions 20 --top-k 5 --output /app/project/test_results.json
     env_file: ../.env
     environment:
       - QDRANT_HOST=qdrant
@@ -177,7 +179,6 @@ services:
       - RAG_API_URL=http://rag_api:8000
     volumes:
       - ..:/app/project
-    working_dir: /app
     depends_on:
       api:
         condition: service_healthy

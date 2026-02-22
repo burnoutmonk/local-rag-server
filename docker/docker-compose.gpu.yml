@@ -49,3 +49,9 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
+
+  rag_test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
+    image: local_rag-app-cuda
