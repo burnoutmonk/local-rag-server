@@ -12,6 +12,7 @@ import argparse
 import json
 import random
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -33,8 +34,8 @@ COLLECTION = os.environ.get("QDRANT_COLLECTION", "rag_docs")
 
 
 # ── HTTP Helpers ──────────────────────────────────────────────────────────────
-def http_post(url: str, data: dict, timeout: int = 60) -> dict:
-    """POST JSON to URL, return parsed response."""
+def http_post(url: str, data: dict, timeout: int = 60, retries: int = 8) -> dict:
+    """POST JSON to URL, return parsed response. Retries on 503 (LLM busy)."""
     payload = json.dumps(data).encode()
     req = urllib.request.Request(
         url,
@@ -42,12 +43,22 @@ def http_post(url: str, data: dict, timeout: int = 60) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read())
-    except Exception as e:
-        print(f"ERROR: HTTP request failed: {e}")
-        raise
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            if e.code == 503 and attempt < retries - 1:
+                wait = 5 * (attempt + 1)
+                print(f"    LLM busy (503), retrying in {wait}s... (attempt {attempt + 1}/{retries})")
+                time.sleep(wait)
+                continue
+            print(f"ERROR: HTTP request failed: {e}")
+            raise
+        except Exception as e:
+            print(f"ERROR: HTTP request failed: {e}")
+            raise
+    raise RuntimeError(f"Failed after {retries} retries")
 
 
 # ── Phase 1: Question Generation ───────────────────────────────────────────────
