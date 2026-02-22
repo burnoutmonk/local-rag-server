@@ -50,6 +50,19 @@ services:
       dockerfile: docker/Dockerfile.cuda
     image: local_rag-app-cuda
 
+  ingest_test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cuda
+    image: local_rag-app-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   rag_test:
     build:
       context: ..

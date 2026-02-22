@@ -160,6 +160,49 @@ services:
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:-0}
     restart: "no"
 
+  # ── Test infrastructure (profile: test) ──────────────────────────────────────
+  # Fully isolated from production: separate Qdrant, separate collection,
+  # separate ingest hash state, reads from data_raw_test/ not data_raw/
+
+  qdrant_test:
+    profiles: ["test"]
+    image: qdrant/qdrant
+    container_name: qdrant_test
+    ports:
+      - "6334:6333"
+    volumes:
+      - qdrant_test_storage:/qdrant/storage
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' 2>/dev/null && exit 0 || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ingest_test:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: local_rag-app
+    container_name: rag_ingest_test
+    command: python3 ingest.py
+    env_file: ../.env
+    environment:
+      - QDRANT_HOST=qdrant_test
+      - COLLECTION=rag_docs_test
+    volumes:
+      - ../data_raw_test:/app/data_raw
+      - ../models:/app/models
+      - ingest_test_state:/app/state
+    depends_on:
+      qdrant_test:
+        condition: service_healthy
+      model_downloader:
+        condition: service_completed_successfully
+    restart: "no"
+
   rag_test:
     profiles: ["test"]
     build:
@@ -172,14 +215,16 @@ services:
     command: python3 /app/scripts/rag_test.py --questions 20 --top-k 5 --output /app/project/test_results.json
     env_file: ../.env
     environment:
-      - QDRANT_HOST=qdrant
+      - QDRANT_HOST=qdrant_test
       - QDRANT_PORT=6333
-      - QDRANT_COLLECTION=rag_docs
+      - QDRANT_COLLECTION=rag_docs_test
       - LLM_URL=http://rag_llm:8080/v1/chat/completions
       - RAG_API_URL=http://rag_api:8000
     volumes:
       - ..:/app/project
     depends_on:
+      ingest_test:
+        condition: service_completed_successfully
       api:
         condition: service_healthy
       llm:
@@ -188,4 +233,6 @@ services:
 
 volumes:
   qdrant_storage:
+  qdrant_test_storage:
   ingest_state:
+  ingest_test_state:
