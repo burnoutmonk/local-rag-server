@@ -4,6 +4,9 @@ httpx
 pydantic
 pypdf
 python-docx
+python-pptx
+openpyxl
+xlrd
 qdrant-client
 sentence-transformers
 numpy

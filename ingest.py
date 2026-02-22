@@ -186,6 +186,171 @@ def read_docx_sections(path: Path) -> List[Tuple[str, str]]:
     return result
 
 
+def read_txt_sections(path: Path) -> List[Tuple[str, str]]:
+    """Read plain text or markdown file as a single section."""
+    try:
+        text = path.read_text(encoding="utf-8")
+        text = normalize_text(text)
+        if text:
+            return [("Document", text)]
+        return []
+    except Exception as exc:
+        print(f"    WARNING: could not read {path.name} ({exc}) -- skipping")
+        return []
+
+
+def read_csv_sections(path: Path) -> List[Tuple[str, str]]:
+    """Read CSV file and format rows as readable text."""
+    import csv
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            rows = list(reader)
+
+        if not rows:
+            return []
+
+        # Check if we have a header
+        header = rows[0] if len(rows) > 0 else []
+        data_rows = rows[1:] if len(rows) > 1 else []
+
+        lines = []
+        for row_idx, row in enumerate(data_rows, 1):
+            if len(header) > 20:
+                # Wide CSV: use key=value format
+                row_text = f"Row {row_idx}: " + ", ".join(
+                    f"{header[i]}={row[i] if i < len(row) else ''}"
+                    for i in range(len(header))
+                )
+            else:
+                # Normal CSV: use tab-separated format
+                row_text = " | ".join(row)
+            lines.append(row_text)
+
+        text = "\n".join(lines)
+        print(f"    [{path.name}] -> {len(data_rows)} rows")
+        return [("CSV Data", text)]
+    except Exception as exc:
+        print(f"    WARNING: could not read CSV {path.name} ({exc}) -- skipping")
+        return []
+
+
+def read_json_sections(path: Path) -> List[Tuple[str, str]]:
+    """Flatten JSON structure to key: value lines."""
+    import json
+
+    def flatten_json(obj, prefix=""):
+        """Recursively flatten JSON to list of 'path: value' lines."""
+        lines = []
+        if isinstance(obj, dict):
+            for key, val in obj.items():
+                new_prefix = f"{prefix}.{key}" if prefix else key
+                if isinstance(val, (dict, list)):
+                    lines.extend(flatten_json(val, new_prefix))
+                else:
+                    lines.append(f"{new_prefix}: {val}")
+        elif isinstance(obj, list):
+            for idx, item in enumerate(obj):
+                new_prefix = f"{prefix}[{idx}]"
+                if isinstance(item, (dict, list)):
+                    lines.extend(flatten_json(item, new_prefix))
+                else:
+                    lines.append(f"{new_prefix}: {item}")
+        return lines
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        lines = flatten_json(data)
+        if lines:
+            text = "\n".join(lines)
+            print(f"    [{path.name}] -> {len(lines)} key-value pairs")
+            return [("JSON Data", text)]
+        return []
+    except Exception as exc:
+        print(f"    WARNING: could not parse JSON {path.name} ({exc}) -- skipping")
+        return []
+
+
+def read_pptx_sections(path: Path) -> List[Tuple[str, str]]:
+    """Extract text from PowerPoint slides."""
+    try:
+        from pptx import Presentation
+        prs = Presentation(str(path))
+        sections: List[Tuple[str, str]] = []
+
+        for slide_idx, slide in enumerate(prs.slides, 1):
+            slide_text_lines = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text = normalize_text(shape.text)
+                    if text:
+                        slide_text_lines.append(text)
+
+            if slide_text_lines:
+                slide_text = "\n".join(slide_text_lines)
+                sections.append((f"Slide {slide_idx}", slide_text))
+
+        print(f"    [{path.name}] -> {len(sections)} slides with text")
+        return sections
+    except Exception as exc:
+        print(f"    WARNING: could not read PPTX {path.name} ({exc}) -- skipping")
+        return []
+
+
+def read_excel_sections(path: Path) -> List[Tuple[str, str]]:
+    """Read Excel file (.xlsx or .xls) — one section per sheet."""
+    try:
+        ext = path.suffix.lower()
+
+        if ext == ".xlsx":
+            from openpyxl import load_workbook
+            wb = load_workbook(str(path))
+            sheets = wb.sheetnames
+            sections: List[Tuple[str, str]] = []
+
+            for sheet_name in sheets:
+                ws = wb[sheet_name]
+                rows_text = []
+                for row in ws.iter_rows(values_only=True):
+                    # Convert row tuple to text, handling None values
+                    row_str = " | ".join(str(cell) if cell is not None else "" for cell in row)
+                    if row_str.strip():
+                        rows_text.append(row_str)
+
+                if rows_text:
+                    section_text = "\n".join(rows_text)
+                    sections.append((f"Sheet: {sheet_name}", section_text))
+
+            print(f"    [{path.name}] -> {len(sections)} sheet(s)")
+            return sections
+
+        elif ext == ".xls":
+            import xlrd
+            wb = xlrd.open_workbook(str(path))
+            sections: List[Tuple[str, str]] = []
+
+            for sheet_name in wb.sheet_names():
+                ws = wb.sheet_by_name(sheet_name)
+                rows_text = []
+                for row_idx in range(ws.nrows):
+                    row = ws.row_values(row_idx)
+                    row_str = " | ".join(str(cell) if cell else "" for cell in row)
+                    if row_str.strip():
+                        rows_text.append(row_str)
+
+                if rows_text:
+                    section_text = "\n".join(rows_text)
+                    sections.append((f"Sheet: {sheet_name}", section_text))
+
+            print(f"    [{path.name}] -> {len(sections)} sheet(s)")
+            return sections
+
+        return []
+    except Exception as exc:
+        print(f"    WARNING: could not read Excel {path.name} ({exc}) -- skipping")
+        return []
+
+
 # ── Worker function for multiprocessing ───────────────────────────────────────
 def process_file_for_chunks(path_str: str):
     """
@@ -198,10 +363,22 @@ def process_file_for_chunks(path_str: str):
     path = Path(path_str)
     t0 = time.time()
 
-    if path.suffix.lower() == ".pdf":
+    ext = path.suffix.lower()
+    if ext == ".pdf":
         sections = read_pdf_sections(path)
-    else:
+    elif ext == ".docx":
         sections = read_docx_sections(path)
+    elif ext == ".pptx":
+        sections = read_pptx_sections(path)
+    elif ext in (".xlsx", ".xls"):
+        sections = read_excel_sections(path)
+    elif ext == ".json":
+        sections = read_json_sections(path)
+    elif ext in (".txt", ".md", ".csv"):
+        sections = read_csv_sections(path) if ext == ".csv" else read_txt_sections(path)
+    else:
+        print(f"    WARNING: unsupported file type {ext} -- skipping {path.name}")
+        return path.name, 0, 0, [], [], 0
 
     doc_id = path.stem
     payloads = []
@@ -236,9 +413,10 @@ def main() -> None:
     if not DATA_DIR.exists():
         raise SystemExit(f"Missing data folder: {DATA_DIR}")
 
-    files = [p for p in DATA_DIR.iterdir() if p.suffix.lower() in [".pdf", ".docx"]]
+    supported_formats = [".pdf", ".docx", ".pptx", ".xlsx", ".xls", ".json", ".txt", ".md", ".csv"]
+    files = [p for p in DATA_DIR.iterdir() if p.suffix.lower() in supported_formats]
     if not files:
-        raise SystemExit(f"No .pdf/.docx files found in {DATA_DIR}")
+        raise SystemExit(f"No supported files found in {DATA_DIR}. Supported: {', '.join(supported_formats)}")
 
     print(f"\n{'='*50}")
     print(f"  Found {len(files)} file(s) in {DATA_DIR}")

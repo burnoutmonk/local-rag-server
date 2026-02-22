@@ -160,6 +160,27 @@ services:
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:-0}
     restart: "no"
 
+  rag_test:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: local_rag-app
+    container_name: rag_test
+    command: python3 scripts/rag_test.py
+    env_file: ../.env
+    environment:
+      - QDRANT_HOST=qdrant
+      - LLM_URL=http://rag_llm:8080/v1/chat/completions
+    volumes:
+      - ..:/app/project
+    depends_on:
+      api:
+        condition: service_healthy
+      llm:
+        condition: service_started
+    restart: "no"
+
 volumes:
   qdrant_storage:
   ingest_state:
