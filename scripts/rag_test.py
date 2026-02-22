@@ -73,24 +73,35 @@ def generate_questions(num_questions: int) -> list[dict]:
 
     print(f"  Collection has {total_points} points. Sampling {num_questions} random chunks...")
 
-    # Sample random point IDs
-    sample_ids = random.sample(range(total_points), min(num_questions, total_points))
+    # Scroll to get actual points (IDs are UUIDs, not sequential integers)
+    # Oversample then randomly pick to get a representative spread
+    oversample = min(num_questions * 5, total_points)
+    print(f"  Scrolling {oversample} points from collection...")
+    all_points, _ = client.scroll(
+        collection_name=COLLECTION,
+        limit=oversample,
+        with_payload=True,
+        with_vectors=False,
+    )
+    print(f"  Scroll returned {len(all_points)} points.")
+
+    if not all_points:
+        raise SystemExit("ERROR: Scroll returned 0 points despite non-empty collection.")
+
+    sampled_points = random.sample(all_points, min(num_questions, len(all_points)))
+    print(f"  Sampled {len(sampled_points)} points for question generation.")
+    print(f"  LLM URL: {DEFAULT_LLM_URL}")
 
     qa_pairs = []
     t0 = time.time()
 
-    for i, point_id in enumerate(sample_ids, 1):
-        # Fetch a random point
-        points = client.retrieve(collection_name=COLLECTION, ids=[point_id], with_payload=True)
-        if not points:
-            continue
-
-        point = points[0]
+    for i, point in enumerate(sampled_points, 1):
         payload = point.payload or {}
         chunk_text = payload.get("text", "")
         source_file = payload.get("source_file", "unknown")
 
         if not chunk_text:
+            print(f"  [{i}/{len(sampled_points)}] Skipping point with empty text (source: {source_file})")
             continue
 
         # Ask LLM to generate a question
@@ -112,12 +123,11 @@ Respond ONLY with valid JSON (no markdown, no extra text):
         }
 
         try:
-            response = http_post(DEFAULT_LLM_URL, payload_llm, timeout=30)
+            response = http_post(DEFAULT_LLM_URL, payload_llm, timeout=60)
             content = response["choices"][0]["message"]["content"].strip()
 
-            # Parse JSON response
-            if content.startswith("```"):
-                # Remove markdown code blocks if present
+            # Parse JSON response — handle markdown code fences
+            if "```" in content:
                 content = content.split("```")[1].lstrip("json").strip()
 
             qa = json.loads(content)
@@ -125,11 +135,11 @@ Respond ONLY with valid JSON (no markdown, no extra text):
                 "question": qa["question"],
                 "answer": qa["answer"],
                 "source_file": source_file,
-                "source_chunk": chunk_text[:500],  # Store first 500 chars for reference
+                "source_chunk": chunk_text[:500],
             })
-            print(f"  [{i}/{len(sample_ids)}] Generated question from {source_file}")
+            print(f"  [{i}/{len(sampled_points)}] Generated question from {source_file}")
         except Exception as e:
-            print(f"  [{i}/{len(sample_ids)}] FAILED to generate question: {e}")
+            print(f"  [{i}/{len(sampled_points)}] FAILED to generate question: {e}")
             continue
 
     elapsed = time.time() - t0

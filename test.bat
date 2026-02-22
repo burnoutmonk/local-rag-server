@@ -19,13 +19,33 @@ echo Starting RAG Accuracy Test...
 echo Note: This requires the Docker stack to be running (start.bat)
 echo.
 
-:: Use same compose files as start.bat so rag_test uses the correct image
+:: Step 1: Start test Qdrant + ingest test documents (isolated from production)
+echo [1/2] Starting qdrant_test and ingesting test documents...
+if "!CUDA_AVAILABLE!"=="true" (
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test up -d --wait qdrant_test
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test run --no-deps --rm ingest_test
+) else (
+    docker compose -f docker/docker-compose.yml --profile test up -d --wait qdrant_test
+    docker compose -f docker/docker-compose.yml --profile test run --no-deps --rm ingest_test
+)
+
+if errorlevel 1 (
+    echo.
+    echo ERROR: Test ingest failed.
+    pause
+    exit /b 1
+)
+
+:: Step 2: Run the accuracy test against the already-running production API + test Qdrant
+echo.
+echo [2/2] Running accuracy test...
+:: --no-deps: production stack (api, llm) is already running via start.bat
 if "!CUDA_AVAILABLE!"=="true" (
     echo GPU mode — using CUDA image for test container
-    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test run --rm rag_test
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test run --no-deps --rm rag_test
 ) else (
     echo CPU mode — using CPU image for test container
-    docker compose -f docker/docker-compose.yml --profile test run --rm rag_test
+    docker compose -f docker/docker-compose.yml --profile test run --no-deps --rm rag_test
 )
 
 if errorlevel 1 (
