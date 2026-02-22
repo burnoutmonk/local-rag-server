@@ -115,12 +115,15 @@ def generate_questions(num_questions: int) -> list[dict]:
             print(f"  [{i}/{len(sampled_points)}] Skipping point with empty text (source: {source_file})")
             continue
 
+        # Truncate chunk to keep prompts small and prefill fast
+        chunk_for_prompt = chunk_text[:800]
+
         # Ask LLM to generate a question
         prompt = f"""Given this text, generate ONE factual question that can be answered ONLY from this text.
 Also provide the correct answer based on the text.
 
 Text:
-{chunk_text}
+{chunk_for_prompt}
 
 Respond ONLY with valid JSON (no markdown, no extra text):
 {{"question": "...", "answer": "..."}}"""
@@ -134,7 +137,7 @@ Respond ONLY with valid JSON (no markdown, no extra text):
         }
 
         try:
-            response = http_post(DEFAULT_LLM_URL, payload_llm, timeout=60)
+            response = http_post(DEFAULT_LLM_URL, payload_llm, timeout=120)
             content = response["choices"][0]["message"]["content"].strip()
 
             # Parse JSON response — handle markdown code fences
@@ -280,7 +283,7 @@ Reply with ONLY valid JSON (no markdown):
                         "temperature": 0.3,
                         "stream": False,
                     }
-                    judge_response = http_post(DEFAULT_LLM_URL, judge_payload, timeout=30)
+                    judge_response = http_post(DEFAULT_LLM_URL, judge_payload, timeout=90)
                     judge_content = judge_response["choices"][0]["message"]["content"].strip()
 
                     if judge_content.startswith("```"):
