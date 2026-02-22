@@ -167,13 +167,17 @@ services:
       dockerfile: docker/Dockerfile
     image: local_rag-app
     container_name: rag_test
-    command: python3 scripts/rag_test.py
+    command: python3 scripts/rag_test.py --questions 20 --top-k 5
     env_file: ../.env
     environment:
       - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=rag_docs
       - LLM_URL=http://rag_llm:8080/v1/chat/completions
+      - RAG_API_URL=http://rag_api:8000
     volumes:
       - ..:/app/project
+    working_dir: /app
     depends_on:
       api:
         condition: service_healthy

@@ -18,16 +18,18 @@ from typing import Any
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
-DEFAULT_API_URL = "http://localhost:8000"
-DEFAULT_LLM_URL = "http://rag_llm:8080/v1/chat/completions"
+import os
+
+DEFAULT_API_URL = os.environ.get("RAG_API_URL", "http://localhost:8000")
+DEFAULT_LLM_URL = os.environ.get("LLM_URL", "http://rag_llm:8080/v1/chat/completions")
 DEFAULT_NUM_QUESTIONS = 20
 DEFAULT_TOP_K = 5
 DEFAULT_OUTPUT = "test_results.json"
 
-# Qdrant settings (same as config.py)
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION = "rag_docs"
+# Qdrant settings (same as config.py, but use test collection if available)
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+COLLECTION = os.environ.get("QDRANT_COLLECTION", "rag_docs")
 
 
 # ── HTTP Helpers ──────────────────────────────────────────────────────────────

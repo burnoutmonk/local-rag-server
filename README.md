@@ -506,6 +506,107 @@ Returns server status including GPU/CUDA state, model info, measured tok/s, and 
 
 ---
 
+## Testing & Benchmarking RAG Accuracy
+
+### Evaluate Retrieval + LLM Quality
+
+The `rag_test.py` script measures how well your RAG system performs on real documents:
+
+1. **Generates test questions** from random chunks in your ingested documents
+2. **Tests all 3 search modes** (Dense / Hybrid / Hybrid+Rerank) on the same questions
+3. **Scores retrieval accuracy** (did it find the right source file?) and **answer accuracy** (is the answer correct?)
+4. **Reports results** showing retrieval %, answer %, and response time per mode
+
+This is useful for:
+- Tuning chunking size, overlap, and retrieval settings
+- Comparing search mode performance on your specific documents
+- Validating that configuration changes improve quality
+
+**Run the test:**
+
+**Windows (Docker):**
+```cmd
+test.bat
+```
+
+**Linux/macOS (Docker):**
+```bash
+chmod +x test.sh
+./test.sh
+```
+
+**Docker directly:**
+```bash
+docker compose -f docker/docker-compose.yml --profile test run rag_test
+```
+
+The script:
+- Samples random chunks from your collection
+- Generates 20 Q&A pairs (customizable: `--questions 100`)
+- Tests all search modes
+- Scores answers using the LLM as a judge
+- Saves results to `test_results.json`
+
+**Sample output:**
+```
+══════════════════════════════════════════════════════════
+RAG Accuracy Test Report
+══════════════════════════════════════════════════════════
+Questions tested:    20
+Unique source files: 8
+
+Search Mode       Retrieval %   Answer %   Avg Time (s)
+─────────────────────────────────────────────────────────
+Dense               80.0%        70.0%       1.1
+Hybrid              90.0%        80.0%       1.4
+Hybrid+Rerank       95.0%        88.0%       3.2
+══════════════════════════════════════════════════════════
+```
+
+**Note:** The test must run against a running stack (start with `start.bat` or `run.sh --docker` first).
+
+---
+
+## Supported Document Formats
+
+Ingest.py supports the following file types:
+
+| Format | Handling |
+|--------|----------|
+| **PDF** | Text extraction per page, cleaned for OCR artifacts |
+| **DOCX** | Paragraphs grouped by heading styles |
+| **PPTX** | One section per slide, text from all shapes |
+| **XLSX / XLS** | One section per sheet, rows formatted as text |
+| **CSV** | Rows formatted as `key=value` (wide CSVs) or pipe-separated (normal) |
+| **JSON** | Flattened to `path.to.key: value` for structure-aware search |
+| **TXT / MD** | Read as-is, chunked by paragraphs |
+
+Place files in `data_raw/` — they're automatically detected on startup.
+
+---
+
+## Docker & Dependency Changes
+
+### Do I need to rebuild Docker if I change requirements.txt?
+
+**Yes.** If you add or update Python dependencies in `requirements.txt`:
+
+```bash
+# Windows
+docker compose -f docker/docker-compose.yml build api ingest benchmark
+start.bat
+
+# Linux/macOS
+docker compose -f docker/docker-compose.yml build api ingest benchmark
+./run.sh --docker
+```
+
+The `build` command rebuilds the images with the new dependencies. You only need to rebuild the services that use the updated code (usually `api`, `ingest`, `benchmark`). The `qdrant` and model images don't need rebuilding.
+
+**Why?** Docker images are immutable. Dependencies are baked in at build time. Code changes don't require a rebuild (Docker can reload them), but dependency changes do.
+
+---
+
 ## Tips
 
 - **Search method:** Hybrid (Dense + BM25) is the default. Switch to Dense for the fastest results or Hybrid + Rerank for the best precision on complex queries.
