@@ -83,6 +83,20 @@ BATCH_SIZE    = env_int("BATCH_SIZE", 64)
 # ── Retrieval (rag_api.py) ────────────────────────────────────────────────────
 MAX_CONTEXT_CHARS = env_int("MAX_CONTEXT_CHARS", 6000)
 
+# Hybrid retrieval: BM25 fusion weight (0 = dense only, 1 = BM25 only)
+BM25_WEIGHT          = env_float("BM25_WEIGHT", 0.5)
+# How many candidates to fetch before BM25/rerank (multiplied by top_k)
+RETRIEVAL_MULTIPLIER = env_int("RETRIEVAL_MULTIPLIER", 4)
+
+# Cross-encoder reranker
+RERANKER_MODEL   = env("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+RERANKER_ENABLED = env("RERANKER_ENABLED", "true").lower() == "true"
+
+
+# ── Chat memory ───────────────────────────────────────────────────────────────
+# Number of previous user+assistant exchanges to include as context (per session)
+CHAT_MEMORY_TURNS = env_int("CHAT_MEMORY_TURNS", 3)
+
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
 API_HOST = env("API_HOST", "0.0.0.0")

@@ -50,7 +50,6 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-
     .logo span { color: var(--muted); }
 
     .status-dot {
@@ -117,30 +116,35 @@
       transition: all 0.15s;
       text-transform: uppercase;
     }
-    .stat-card {
-      background: var(--surface);
+    .mode-btn.active { background: var(--accent); color: #fff; }
+    .mode-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+
+    /* Search method toggle */
+    .search-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1rem;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .search-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.04em;
+      padding: 0.5rem 0.25rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
       text-align: center;
     }
-    .stat-label {
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-    }
-    .stat-value {
-      font-family: var(--mono);
-      font-size: 1.5rem;
-      color: var(--text);
-    }
-    .mode-btn.active {
-      background: var(--accent);
-      color: #fff;
-    }
-    .mode-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+    .search-btn:last-child { border-right: none; }
+    .search-btn.active { background: var(--accent2); color: #fff; }
+    .search-btn:hover:not(.active):not(:disabled) { background: var(--border); color: var(--text); }
+    .search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     /* Sliders */
     .control { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -150,12 +154,10 @@
       justify-content: space-between;
       align-items: center;
     }
-
     .control-header label {
       font-size: 0.78rem;
       color: var(--text);
     }
-
     .control-value {
       font-family: var(--mono);
       font-size: 0.72rem;
@@ -181,20 +183,81 @@
     }
     input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.3); }
 
-    /* Timeout */
     .timeout-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-
     .timeout-row input[type="checkbox"] {
       accent-color: var(--accent);
       width: 14px; height: 14px;
       cursor: pointer;
     }
-
     .timeout-row label { font-size: 0.78rem; color: var(--muted); cursor: pointer; }
+
+    /* Config table */
+    .cfg-table {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .cfg-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .cfg-row span:last-child {
+      color: var(--text);
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Tooltip system ── */
+    [data-tip] {
+      position: relative;
+      cursor: help;
+    }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 7px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e2535;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.65rem;
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      font-weight: 300;
+      color: var(--text);
+      width: max-content;
+      max-width: 210px;
+      white-space: normal;
+      line-height: 1.5;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 100;
+    }
+    [data-tip]:hover::after { opacity: 1; }
+
+    /* Peak stats */
+    .peak-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 0.63rem;
+      color: var(--muted);
+    }
+    .peak-row .peak-val { color: var(--text); }
+    .peak-row .peak-max { color: var(--warning); }
 
     /* ── Main ── */
     main {
@@ -203,7 +266,6 @@
       overflow: hidden;
     }
 
-    /* Chat window */
     #chat {
       flex: 1;
       overflow-y: auto;
@@ -213,34 +275,28 @@
       gap: 1.5rem;
       scroll-behavior: smooth;
     }
-
     #chat::-webkit-scrollbar { width: 4px; }
     #chat::-webkit-scrollbar-track { background: transparent; }
     #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-    /* Empty state */
     .empty-state {
       margin: auto;
       text-align: center;
       opacity: 0.4;
     }
-
     .empty-state .big {
       font-family: var(--mono);
       font-size: 2.5rem;
       color: var(--accent);
       line-height: 1;
     }
-
     .empty-state p {
       font-size: 0.85rem;
       color: var(--muted);
       margin-top: 0.5rem;
     }
 
-    /* Messages */
     .msg { display: flex; flex-direction: column; gap: 0.3rem; animation: fadeUp 0.2s ease; }
-
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -252,7 +308,6 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
-
     .msg.user .msg-role { color: var(--accent); }
     .msg.assistant .msg-role { color: var(--success); }
     .msg.error .msg-role { color: var(--warning); }
@@ -264,7 +319,6 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     .msg.user .msg-body {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -274,14 +328,12 @@
       max-width: 80%;
     }
 
-    /* Citations */
     .citations {
       display: flex;
       flex-wrap: wrap;
       gap: 0.4rem;
       margin-top: 0.5rem;
     }
-
     .citation-tag {
       font-family: var(--mono);
       font-size: 0.65rem;
@@ -294,12 +346,7 @@
       transition: all 0.15s;
       position: relative;
     }
-    .citation-tag:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Tooltip */
+    .citation-tag:hover { border-color: var(--accent); color: var(--accent); }
     .citation-tag .tooltip {
       display: none;
       position: absolute;
@@ -320,7 +367,6 @@
     }
     .citation-tag:hover .tooltip { display: block; }
 
-    /* Thinking indicator */
     .thinking {
       display: flex;
       align-items: center;
@@ -329,11 +375,7 @@
       font-family: var(--mono);
       font-size: 0.72rem;
     }
-
-    #thinking-timer {
-      color: var(--accent);
-      min-width: 3rem;
-    }
+    #thinking-timer { color: var(--accent); min-width: 3rem; }
 
     .msg-timer {
       font-family: var(--mono);
@@ -351,13 +393,11 @@
     }
     .dots span:nth-child(2) { animation-delay: 0.15s; }
     .dots span:nth-child(3) { animation-delay: 0.3s; }
-
     @keyframes bounce {
       0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
       40%            { transform: translateY(-4px); opacity: 1; }
     }
 
-    /* ── Input bar ── */
     .input-bar {
       border-top: 1px solid var(--border);
       padding: 1rem 2rem;
@@ -366,7 +406,6 @@
       align-items: flex-end;
       background: var(--surface);
     }
-
     #query {
       flex: 1;
       background: var(--bg);
@@ -405,7 +444,6 @@
     #send-btn:hover:not(:disabled) { background: #3b7ef6; transform: translateY(-1px); }
     #send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-    /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border);
       padding: 0.5rem 2rem;
@@ -417,12 +455,10 @@
       background: var(--surface);
     }
 
-    /* ── Scrollbar global ── */
     sidebar::-webkit-scrollbar { width: 3px; }
     sidebar::-webkit-scrollbar-thumb { background: var(--border); }
-
   </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -434,24 +470,110 @@
     <span class="status-label" id="status-label">checking...</span>
   </div>
 </header>
-<div class="layout">
 
+<div class="layout">
   <!-- ── Sidebar ── -->
   <sidebar>
 
+    <!-- Server info -->
     <div>
-      <div class="section-label">Mode</div>
-      <div class="mode-toggle">
-        <button class="mode-btn active" id="btn-answer" onclick="setMode('answer')">Answer</button>
-        <button class="mode-btn"        id="btn-search" onclick="setMode('search')">Search</button>
-
+      <div class="section-label">Server</div>
+      <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted);display:flex;flex-direction:column;gap:0.35rem;">
+        <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:baseline;"
+             data-tip="The GGUF language model running on the llama.cpp server.">
+          <span style="flex-shrink:0;">LLM</span>
+          <span id="info-model" style="color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:baseline;"
+             data-tip="Sentence-transformer model used to embed documents and queries into vectors for similarity search.">
+          <span style="flex-shrink:0;">Embed</span>
+          <span id="info-embed" style="color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+        </div>
+        <div id="info-reranker-row" style="display:none;justify-content:space-between;gap:0.5rem;align-items:baseline;"
+             data-tip="Cross-encoder model used to rerank retrieved chunks by relevance when Rerank mode is active.">
+          <span style="flex-shrink:0;">Reranker</span>
+          <span id="info-reranker" style="color:var(--text);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
+        </div>
       </div>
     </div>
 
+    <!-- Server admin config (read-only) -->
+    <div>
+      <div class="section-label">Config <span style="font-size:0.58rem;letter-spacing:0;">(server admin)</span></div>
+      <div class="cfg-table">
+        <div class="cfg-row" data-tip="Maximum token context window loaded for the LLM. Larger = more history but more VRAM.">
+          <span>Context</span>
+          <span style="display:flex;align-items:center;gap:0.35rem;">
+            <span id="cfg-context-warn" style="display:none;color:var(--warning);font-size:0.6rem;"
+                  title="Context over 4096 on CPU is very slow and may cause out-of-memory errors">⚠ CPU</span>
+            <span id="cfg-context">—</span>
+          </span>
+        </div>
+        <div class="cfg-row" data-tip="CPU threads allocated to inference. Has no effect when running on GPU.">
+          <span>Threads</span><span id="cfg-threads">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Number of model layers offloaded to GPU. -1 = all layers (full GPU), 0 = CPU only.">
+          <span>GPU layers</span><span id="cfg-gpu-layers">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Server-side hard cap on response length. Your Max Response Tokens slider cannot exceed this.">
+          <span>Max tokens</span><span id="cfg-max-tokens">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Minimum response length enforced server-side. Your slider cannot go below this.">
+          <span>Min tokens</span><span id="cfg-min-tokens">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Maximum character length of each document chunk stored in the vector database.">
+          <span>Chunk size</span><span id="cfg-chunk-size">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Character overlap between consecutive chunks to preserve context across boundaries.">
+          <span>Overlap</span><span id="cfg-overlap">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Qdrant vector collection name where document embeddings are stored.">
+          <span>Collection</span><span id="cfg-collection">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Weight given to BM25 keyword scores in Hybrid mode. 0.0 = pure dense, 1.0 = pure BM25, 0.5 = equal blend.">
+          <span>BM25 weight</span><span id="cfg-bm25-weight">—</span>
+        </div>
+        <div class="cfg-row" data-tip="How many extra candidates are fetched before BM25 or reranking filters them down to Top K. Higher = better reranking quality but slower retrieval.">
+          <span>Retrieval ×</span><span id="cfg-ret-mult">—</span>
+        </div>
+        <div class="cfg-row" data-tip="Number of previous question/answer pairs kept in context per browser session. 0 = no memory.">
+          <span>Memory turns</span><span id="cfg-memory-turns">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output mode -->
+    <div>
+      <div class="section-label">Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-answer" onclick="setMode('answer')"
+                data-tip="Retrieves relevant chunks and passes them to the LLM to generate an answer with citations.">Answer</button>
+        <button class="mode-btn" id="btn-search" onclick="setMode('search')"
+                data-tip="Returns raw matching passages from your documents without calling the LLM. Much faster.">Search</button>
+      </div>
+    </div>
+
+    <!-- Search method -->
+    <div>
+      <div class="section-label">Search Method</div>
+      <div class="search-toggle">
+        <button class="search-btn" id="btn-dense" onclick="setSearch('dense')"
+                data-tip="Pure vector similarity search using the embedding model. Fast and semantically aware.">Dense</button>
+        <button class="search-btn active" id="btn-hybrid" onclick="setSearch('hybrid')"
+                data-tip="Combines dense vector search with BM25 keyword scoring. Better for keyword-heavy queries.">Hybrid</button>
+        <button class="search-btn" id="btn-rerank" onclick="setSearch('rerank')"
+                data-tip="Hybrid search followed by a cross-encoder model that re-scores each chunk. Best quality, adds ~1-2s.">Rerank</button>
+      </div>
+      <p style="margin-top:0.5rem;font-size:0.63rem;color:var(--muted);line-height:1.5;" id="search-method-hint">
+        Dense + BM25 keyword fusion
+      </p>
+    </div>
+
+    <!-- Retrieval -->
     <div>
       <div class="section-label">Retrieval</div>
       <div class="control">
-        <div class="control-header">
+        <div class="control-header" data-tip="How many document chunks to retrieve and include as context for the LLM. More chunks = more coverage but slower responses.">
           <label>Top K chunks</label>
           <span class="control-value" id="topk-val">5</span>
         </div>
@@ -460,10 +582,11 @@
       </div>
     </div>
 
+    <!-- Timeout -->
     <div>
       <div class="section-label">Timeout</div>
       <div class="control">
-        <div class="control-header">
+        <div class="control-header" data-tip="Maximum seconds to wait for a response. Set higher for large responses or slow hardware. 'No limit' waits indefinitely.">
           <label>Max wait</label>
           <span class="control-value" id="timeout-val">30s</span>
         </div>
@@ -476,23 +599,25 @@
       </div>
     </div>
 
+    <!-- Max tokens slider — bounds loaded from server -->
     <div>
       <div class="section-label">Max Response Tokens</div>
       <div class="control">
-        <div class="control-header">
+        <div class="control-header" data-tip="Maximum number of tokens the LLM will generate. Bounded by the server admin's MIN_TOKENS and MAX_TOKENS settings.">
           <label>Token limit</label>
-          <span class="control-value" id="max-tokens-val">500</span>
+          <span class="control-value" id="max-tokens-val">—</span>
         </div>
-        <input type="range" id="max-tokens-slider" min="100" max="2000" step="50" value="500"
+        <input type="range" id="max-tokens-slider" min="50" max="2000" step="50" value="500"
                oninput="document.getElementById('max-tokens-val').textContent=this.value">
       </div>
     </div>
 
+    <!-- LLM Sampling -->
     <div>
       <div class="section-label">LLM Sampling</div>
       <div style="display:flex;flex-direction:column;gap:0.9rem;">
         <div class="control">
-          <div class="control-header">
+          <div class="control-header" data-tip="Controls randomness. 0 = deterministic/factual, 1 = balanced, 2 = very creative. Use lower values for RAG Q&A.">
             <label>Temperature</label>
             <span class="control-value" id="temp-val">0.7</span>
           </div>
@@ -500,7 +625,7 @@
                  oninput="document.getElementById('temp-val').textContent=parseFloat(this.value).toFixed(2)">
         </div>
         <div class="control">
-          <div class="control-header">
+          <div class="control-header" data-tip="Nucleus sampling: only tokens within the top P cumulative probability mass are considered. Lower = more focused.">
             <label>Top P</label>
             <span class="control-value" id="topp-val">0.80</span>
           </div>
@@ -508,7 +633,7 @@
                  oninput="document.getElementById('topp-val').textContent=parseFloat(this.value).toFixed(2)">
         </div>
         <div class="control">
-          <div class="control-header">
+          <div class="control-header" data-tip="Top-K sampling: limits each token selection to the K most probable options. Lower = less variety.">
             <label>Sample Top K</label>
             <span class="control-value" id="llm-topk-val">20</span>
           </div>
@@ -516,7 +641,7 @@
                  oninput="document.getElementById('llm-topk-val').textContent=this.value">
         </div>
         <div class="control">
-          <div class="control-header">
+          <div class="control-header" data-tip="Min-P sampling: removes tokens whose probability is below P × (probability of the most likely token). Reduces low-quality output.">
             <label>Min P</label>
             <span class="control-value" id="minp-val">0.00</span>
           </div>
@@ -529,36 +654,83 @@
       </p>
     </div>
 
+    <!-- Analytics -->
     <div>
       <div class="section-label">Analytics</div>
       <div style="font-family:var(--mono); font-size:0.72rem; color:var(--muted); display:flex; flex-direction:column; gap:0.4rem;">
         <div style="display:flex; justify-content:space-between;">
           <span>Queries</span><span id="an-total" style="color:var(--text)">0</span>
         </div>
-        <div style="display:flex; justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between;" data-tip="Average tokens generated per second across all queries this session.">
           <span>Avg tok/s</span><span id="an-tps" style="color:var(--text)">—</span>
         </div>
-        <div style="display:flex; justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between;" data-tip="Average number of tokens sent to the LLM (query + retrieved chunks + history).">
           <span>Avg prompt tokens</span><span id="an-prompt" style="color:var(--text)">—</span>
         </div>
-        <div style="display:flex; justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between;" data-tip="Average number of tokens generated by the LLM in its response.">
           <span>Avg response tokens</span><span id="an-completion" style="color:var(--text)">—</span>
         </div>
         <div style="display:flex; justify-content:space-between;">
           <span>Last tok/s</span><span id="an-last-tps" style="color:var(--success)">—</span>
         </div>
-        <div style="display:flex; justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between;" data-tip="Total wall-clock time from sending the query to receiving the full response, including retrieval.">
           <span>Avg response time</span><span id="an-response-time" style="color:var(--text)">—</span>
         </div>
       </div>
       <div style="margin-top:0.75rem;">
         <div style="font-size:0.65rem; color:var(--muted); margin-bottom:0.3rem;">tok/s history</div>
-        <canvas id="chart-tps-sidebar" height="60"></canvas>
+        <canvas id="chart-tps-sidebar" height="55"></canvas>
+      </div>
+      <div style="margin-top:0.6rem;">
+        <div style="font-size:0.65rem; color:var(--muted); margin-bottom:0.3rem;">response time (s)</div>
+        <canvas id="chart-rt-sidebar" height="55"></canvas>
       </div>
     </div>
 
+    <!-- System: peak stats -->
+    <div>
+      <div class="section-label" data-tip="Peak values recorded since the page was opened. Refresh to reset.">System <span style="font-size:0.58rem;letter-spacing:0;">(peak)</span></div>
+      <div style="font-family:var(--mono);font-size:0.68rem;display:flex;flex-direction:column;gap:0.5rem;">
+        <div data-tip="Peak CPU usage recorded across all cores since page load.">
+          <div class="peak-row">
+            <span style="color:var(--muted);">CPU</span>
+            <span><span id="sys-cpu-cur" class="peak-val">—</span> &nbsp;<span id="sys-cpu-max" class="peak-max" style="font-size:0.6rem;">max —</span></span>
+          </div>
+        </div>
+        <div data-tip="RAM usage. The peak (max) value is the highest observed since page load.">
+          <div class="peak-row">
+            <span style="color:var(--muted);">RAM</span>
+            <span><span id="sys-ram-cur" class="peak-val">—</span> &nbsp;<span id="sys-ram-max" class="peak-max" style="font-size:0.6rem;">max —</span></span>
+          </div>
+        </div>
+        <div id="sys-gpu-row" style="display:none;" data-tip="GPU utilisation. Peak is the highest observed since page load.">
+          <div class="peak-row">
+            <span style="color:var(--muted);">GPU</span>
+            <span><span id="sys-gpu-cur" class="peak-val" style="color:var(--success);">—</span> &nbsp;<span id="sys-gpu-max" class="peak-max" style="font-size:0.6rem;">max —</span></span>
+          </div>
+        </div>
+        <div id="sys-vram-row" style="display:none;" data-tip="GPU VRAM usage. Peak is the highest observed since page load.">
+          <div class="peak-row">
+            <span style="color:var(--muted);">VRAM</span>
+            <span><span id="sys-vram-cur" class="peak-val" style="color:var(--success);">—</span> &nbsp;<span id="sys-vram-max" class="peak-max" style="font-size:0.6rem;">max —</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session -->
     <div style="margin-top:auto;">
-      <div class="section-label">Session</div>
+      <div class="section-label" data-tip="Each browser tab has its own independent conversation memory. Clearing chat starts a fresh session — the server forgets your conversation history.">Session</div>
+      <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);margin-bottom:0.5rem;display:flex;flex-direction:column;gap:0.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span data-tip="The LLM receives the last N question/answer pairs as context. Set by CHAT_MEMORY_TURNS in .env.">Memory</span>
+          <span id="session-memory-status" style="color:var(--accent);">— turns</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span data-tip="Messages stored in this tab's session so far (user + assistant pairs).">Stored</span>
+          <span id="session-msg-count" style="color:var(--text);">0 msgs</span>
+        </div>
+      </div>
       <button onclick="clearChat()" style="
         background:transparent;border:1px solid var(--border);border-radius:6px;
         color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:0.68rem;
@@ -583,43 +755,150 @@
       <textarea id="query" rows="1" placeholder="Ask a question…"></textarea>
       <button id="send-btn" onclick="send()">Send</button>
     </div>
-
   </main>
-
 </div>
 
 <footer>
   <span id="footer-mode">mode: answer</span>
   <span id="footer-topk">top-k: 5</span>
   <span id="footer-timeout">timeout: 30s</span>
+  <span id="footer-search">search: hybrid</span>
 </footer>
 
 <script>
   // ── State ──────────────────────────────────────────────────────────────────
   let mode = 'answer';
+  let searchMethod = 'hybrid';
+  let rerankerAvailable = true;
+  let sessionMsgCount = 0;  // tracks user+assistant pairs stored server-side
+
+  // Peak system stats
+  let peakCpu = 0, peakRamGb = 0, peakGpuPct = 0, peakVramGb = 0;
+
+  // ── Session ID (per browser tab) ──────────────────────────────────────────
+  let sessionId = sessionStorage.getItem('rag_session');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem('rag_session', sessionId);
+  }
 
   // ── Health check ──────────────────────────────────────────────────────────
   async function checkHealth() {
     try {
       const r = await fetch('/health');
-      if (r.ok) {
-        const data = await r.json();
-        document.getElementById('status-dot').classList.add('online');
-        document.getElementById('status-label').textContent = 'online';
-        const badge = document.getElementById('gpu-badge');
-        if (badge) {
-          if (data.gpu_enabled && data.cuda_available) {
-            badge.textContent = `⚡ GPU · ${data.tokens_per_second} tok/s`;
-            badge.style.color = 'var(--success)';
-            badge.title = `CUDA enabled · ${data.gpu_layers} layers`;
-          } else {
-            badge.textContent = `🖥 CPU · ${data.tokens_per_second} tok/s`;
-            badge.style.color = 'var(--muted)';
-            badge.title = 'CPU only';
-          }
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+
+      document.getElementById('status-dot').classList.add('online');
+      document.getElementById('status-label').textContent = 'online';
+
+      // Header badge
+      const badge = document.getElementById('gpu-badge');
+      if (badge) {
+        if (data.gpu_enabled && data.cuda_available) {
+          badge.textContent = `⚡ GPU · ${data.tokens_per_second} tok/s`;
+          badge.style.color = 'var(--success)';
+          badge.title = `CUDA · ${data.gpu_layers === -1 ? 'all' : data.gpu_layers} layers`;
+        } else {
+          badge.textContent = `🖥 CPU · ${data.tokens_per_second} tok/s`;
+          badge.style.color = 'var(--muted)';
+          badge.title = 'CPU only';
         }
       }
+
+      // Server info panel
+      document.getElementById('info-model').textContent = (data.model || '—').replace(/\.gguf$/i, '');
+      document.getElementById('info-embed').textContent = (data.embed_model || '—').split('/').pop();
+      if (data.reranker_model) {
+        const rerRow = document.getElementById('info-reranker-row');
+        rerRow.style.display = 'flex';
+        document.getElementById('info-reranker').textContent = data.reranker_model.split('/').pop();
+      }
+
+      // Config panel
+      document.getElementById('cfg-context').textContent    = data.llm_context ? data.llm_context.toLocaleString() : '—';
+      document.getElementById('cfg-threads').textContent    = data.llm_threads ?? '—';
+      document.getElementById('cfg-gpu-layers').textContent = data.gpu_layers !== undefined
+        ? (data.gpu_layers === -1 ? 'all' : data.gpu_layers === 0 ? 'CPU' : data.gpu_layers)
+        : '—';
+      document.getElementById('cfg-max-tokens').textContent = data.max_tokens_config ?? '—';
+      document.getElementById('cfg-min-tokens').textContent = data.min_tokens_config ?? '—';
+      document.getElementById('cfg-chunk-size').textContent = data.chunk_size ?? '—';
+      document.getElementById('cfg-overlap').textContent    = data.overlap ?? '—';
+      document.getElementById('cfg-collection').textContent = data.collection ?? '—';
+      document.getElementById('cfg-bm25-weight').textContent   = data.bm25_weight ?? '—';
+      document.getElementById('cfg-ret-mult').textContent      = data.retrieval_multiplier ? '×' + data.retrieval_multiplier : '—';
+      document.getElementById('cfg-memory-turns').textContent  = data.chat_memory_turns !== undefined
+        ? (data.chat_memory_turns === 0 ? 'off' : data.chat_memory_turns)
+        : '—';
+
+      // CPU context warning: show if CPU mode and context > 4096
+      const cpuMode = !data.gpu_enabled || !data.cuda_available;
+      const ctxWarn = document.getElementById('cfg-context-warn');
+      if (ctxWarn) ctxWarn.style.display = (cpuMode && data.llm_context > 4096) ? '' : 'none';
+
+      // Session memory status
+      const memTurns = data.chat_memory_turns ?? 0;
+      const memEl = document.getElementById('session-memory-status');
+      if (memEl) memEl.textContent = memTurns > 0 ? `${memTurns} turns` : 'off';
+
+      // Set max-tokens slider bounds from server config (only once on first successful response)
+      if (data.max_tokens_config && data.min_tokens_config) {
+        const slider = document.getElementById('max-tokens-slider');
+        const maxCfg = data.max_tokens_config;
+        const minCfg = data.min_tokens_config;
+        slider.min = minCfg;
+        slider.max = maxCfg;
+        // Only reset value if it's out of bounds
+        const cur = parseInt(slider.value);
+        if (cur < minCfg) { slider.value = minCfg; document.getElementById('max-tokens-val').textContent = minCfg; }
+        if (cur > maxCfg) { slider.value = maxCfg; document.getElementById('max-tokens-val').textContent = maxCfg; }
+        // Set initial display if still showing placeholder
+        if (document.getElementById('max-tokens-val').textContent === '—') {
+          slider.value = Math.min(maxCfg, Math.max(minCfg, 500));
+          document.getElementById('max-tokens-val').textContent = slider.value;
+        }
+      }
+
+      // Reranker availability
+      rerankerAvailable = data.reranker_available !== false;
+      const rerankBtn = document.getElementById('btn-rerank');
+      if (rerankBtn) {
+        rerankBtn.disabled = !rerankerAvailable;
+        rerankBtn.title = rerankerAvailable
+          ? 'Dense + BM25 + cross-encoder reranker'
+          : 'Reranker disabled by server admin (RERANKER_ENABLED=false)';
+      }
+
+      // System stats — track peaks
+      const cpu = data.cpu_percent ?? 0;
+      peakCpu = Math.max(peakCpu, cpu);
+      document.getElementById('sys-cpu-cur').textContent = cpu + '%';
+      document.getElementById('sys-cpu-max').textContent = 'max ' + peakCpu + '%';
+
+      const ramGb = data.ram_used_gb ?? 0;
+      peakRamGb = Math.max(peakRamGb, ramGb);
+      document.getElementById('sys-ram-cur').textContent = ramGb + ' GB';
+      document.getElementById('sys-ram-max').textContent = 'max ' + peakRamGb + ' GB';
+
+      if (data.gpu) {
+        document.getElementById('sys-gpu-row').style.display = '';
+        document.getElementById('sys-vram-row').style.display = '';
+
+        const gpuPct = data.gpu.util_percent ?? 0;
+        peakGpuPct = Math.max(peakGpuPct, gpuPct);
+        document.getElementById('sys-gpu-cur').textContent = gpuPct + '%';
+        document.getElementById('sys-gpu-max').textContent = 'max ' + peakGpuPct + '%';
+
+        const vramGb = +(data.gpu.memory_used_mb / 1024).toFixed(1);
+        const vramTotal = (data.gpu.memory_total_mb / 1024).toFixed(1);
+        peakVramGb = Math.max(peakVramGb, vramGb);
+        document.getElementById('sys-vram-cur').textContent = vramGb + ' / ' + vramTotal + ' GB';
+        document.getElementById('sys-vram-max').textContent = 'max ' + peakVramGb + ' GB';
+      }
+
     } catch {
+      document.getElementById('status-dot').classList.remove('online');
       document.getElementById('status-label').textContent = 'offline';
     }
   }
@@ -631,30 +910,28 @@
     mode = m;
     document.getElementById('btn-answer').classList.toggle('active', m === 'answer');
     document.getElementById('btn-search').classList.toggle('active', m === 'search');
-    document.getElementById('btn-analytics').classList.toggle('active', m === 'analytics');
     document.getElementById('footer-mode').textContent = `mode: ${m}`;
-
-    const chatArea = document.getElementById('chat');
-    const inputArea = document.querySelector('.input-area');
-    const analyticsPanel = document.getElementById('analytics-panel');
-    const sendBtn = document.getElementById('send-btn');
-
-    if (m === 'analytics') {
-      chatArea.style.display = 'none';
-      inputArea.style.display = 'none';
-      sendBtn.style.display = 'none';
-      analyticsPanel.style.display = 'block';
-      loadAnalytics();
-    } else {
-      chatArea.style.display = '';
-      inputArea.style.display = '';
-      sendBtn.style.display = '';
-      analyticsPanel.style.display = 'none';
-    }
   }
 
-  // ── Analytics ─────────────────────────────────────────────────────────────
+  // ── Search method ─────────────────────────────────────────────────────────
+  const searchHints = {
+    dense:  'Dense vector search only',
+    hybrid: 'Dense + BM25 keyword fusion',
+    rerank: 'Dense + BM25 + cross-encoder reranker',
+  };
+  function setSearch(method) {
+    if (method === 'rerank' && !rerankerAvailable) return;
+    searchMethod = method;
+    document.getElementById('btn-dense').classList.toggle('active',  method === 'dense');
+    document.getElementById('btn-hybrid').classList.toggle('active', method === 'hybrid');
+    document.getElementById('btn-rerank').classList.toggle('active', method === 'rerank');
+    document.getElementById('search-method-hint').textContent = searchHints[method] || '';
+    document.getElementById('footer-search').textContent = `search: ${method}`;
+  }
+
+  // ── Analytics charts ──────────────────────────────────────────────────────
   let chartTpsSidebar = null;
+  let chartRtSidebar  = null;
 
   async function updateAnalytics() {
     try {
@@ -664,134 +941,58 @@
       if (!h.length) return;
 
       document.getElementById('an-total').textContent = h.length;
-      document.getElementById('an-tps').textContent = (h.reduce((a, x) => a + x.tokens_per_second, 0) / h.length).toFixed(1);
-      document.getElementById('an-prompt').textContent = Math.round(h.reduce((a, x) => a + x.prompt_tokens, 0) / h.length);
-      document.getElementById('an-completion').textContent = Math.round(h.reduce((a, x) => a + x.completion_tokens, 0) / h.length);
-      document.getElementById('an-last-tps').textContent = h[h.length - 1].tokens_per_second + ' tok/s';
-      document.getElementById('an-response-time').textContent = (h.reduce((a, x) => a + x.response_time, 0) / h.length).toFixed(1) + 's';
+      document.getElementById('an-tps').textContent =
+        (h.reduce((a, x) => a + x.tokens_per_second, 0) / h.length).toFixed(1);
+      document.getElementById('an-prompt').textContent =
+        Math.round(h.reduce((a, x) => a + x.prompt_tokens, 0) / h.length);
+      document.getElementById('an-completion').textContent =
+        Math.round(h.reduce((a, x) => a + x.completion_tokens, 0) / h.length);
+      document.getElementById('an-last-tps').textContent =
+        h[h.length - 1].tokens_per_second + ' tok/s';
+      document.getElementById('an-response-time').textContent =
+        (h.reduce((a, x) => a + x.response_time, 0) / h.length).toFixed(1) + 's';
 
-      // Tok/s sparkline chart
-      const labels = h.map((_, i) => `Q${i+1}`);
+      const labels  = h.map((_, i) => `Q${i+1}`);
       const tpsData = h.map(x => x.tokens_per_second);
-      const ctx = document.getElementById('chart-tps-sidebar').getContext('2d');
+      const rtData  = h.map(x => x.response_time);
+
+      // tok/s chart
+      const ctxTps = document.getElementById('chart-tps-sidebar').getContext('2d');
       if (!chartTpsSidebar) {
-        chartTpsSidebar = new Chart(ctx, {
+        chartTpsSidebar = new Chart(ctxTps, {
           type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              data: tpsData,
-              borderColor: '#22c55e',
-              backgroundColor: '#22c55e22',
-              tension: 0.3,
-              pointRadius: 2,
-              fill: true,
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 6 } },
-              y: { ticks: { color: '#555', font: { size: 9 } }, beginAtZero: true }
-            }
-          }
+          data: { labels, datasets: [{ data: tpsData, borderColor: '#22c55e', backgroundColor: '#22c55e22', tension: 0.3, pointRadius: 2, fill: true }] },
+          options: { responsive: true, plugins: { legend: { display: false } },
+            scales: { x: { ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 6 } }, y: { ticks: { color: '#555', font: { size: 9 } }, beginAtZero: true } } }
         });
       } else {
         chartTpsSidebar.data.labels = labels;
         chartTpsSidebar.data.datasets[0].data = tpsData;
         chartTpsSidebar.update();
       }
+
+      // response time chart
+      const ctxRt = document.getElementById('chart-rt-sidebar').getContext('2d');
+      if (!chartRtSidebar) {
+        chartRtSidebar = new Chart(ctxRt, {
+          type: 'line',
+          data: { labels, datasets: [{ data: rtData, borderColor: '#f59e0b', backgroundColor: '#f59e0b22', tension: 0.3, pointRadius: 2, fill: true }] },
+          options: { responsive: true, plugins: { legend: { display: false } },
+            scales: { x: { ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 6 } }, y: { ticks: { color: '#555', font: { size: 9 } }, beginAtZero: true } } }
+        });
+      } else {
+        chartRtSidebar.data.labels = labels;
+        chartRtSidebar.data.datasets[0].data = rtData;
+        chartRtSidebar.update();
+      }
     } catch(e) {}
-  }
-
-  // ── Chart instances ────────────────────────────────────────────────────────
-  let chartTps = null, chartPrompt = null, chartCompletion = null;
-
-  function makeChart(id, label, color) {
-    const ctx = document.getElementById(id).getContext('2d');
-    return new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          label,
-          data: [],
-          borderColor: color,
-          backgroundColor: color + '22',
-          tension: 0.3,
-          pointRadius: 3,
-          fill: true,
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#666', maxTicksLimit: 8 } },
-          y: { ticks: { color: '#666' }, beginAtZero: true }
-        }
-      }
-    });
-  }
-
-  async function loadAnalytics() {
-    try {
-      const r = await fetch('/metrics');
-      const data = await r.json();
-      const history = data.history;
-
-      if (!history.length) {
-        document.getElementById('query-history').textContent = 'No queries yet.';
-        return;
-      }
-
-      // Stats
-      const avgTps = (history.reduce((a, h) => a + h.tokens_per_second, 0) / history.length).toFixed(1);
-      const avgPrompt = Math.round(history.reduce((a, h) => a + h.prompt_tokens, 0) / history.length);
-      const avgCompletion = Math.round(history.reduce((a, h) => a + h.completion_tokens, 0) / history.length);
-      document.getElementById('stat-total').textContent = history.length;
-      document.getElementById('stat-tps').textContent = avgTps;
-      document.getElementById('stat-prompt').textContent = avgPrompt;
-      document.getElementById('stat-completion').textContent = avgCompletion;
-
-      const labels = history.map((h, i) => `Q${i + 1}`);
-
-      // Charts
-      if (!chartTps) chartTps = makeChart('chart-tps', 'tok/s', '#22c55e');
-      if (!chartPrompt) chartPrompt = makeChart('chart-prompt', 'prompt tokens', '#3b82f6');
-      if (!chartCompletion) chartCompletion = makeChart('chart-completion', 'response tokens', '#a855f7');
-
-      [chartTps, chartPrompt, chartCompletion].forEach(c => c.data.labels = labels);
-      chartTps.data.datasets[0].data = history.map(h => h.tokens_per_second);
-      chartPrompt.data.datasets[0].data = history.map(h => h.prompt_tokens);
-      chartCompletion.data.datasets[0].data = history.map(h => h.completion_tokens);
-      [chartTps, chartPrompt, chartCompletion].forEach(c => c.update());
-
-      // Query history table
-      const histDiv = document.getElementById('query-history');
-      histDiv.innerHTML = history.slice().reverse().map((h, i) => `
-        <div style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
-          <span style="color:var(--text)">${history.length - i}. ${h.query}</span>
-          <span style="float:right; color:var(--muted)">
-            ${h.tokens_per_second} tok/s &nbsp;|&nbsp;
-            ${h.prompt_tokens}p + ${h.completion_tokens}r tokens
-          </span>
-        </div>
-      `).join('');
-
-    } catch(e) {
-      console.error('Analytics error:', e);
-    }
   }
 
   // ── Sync footer ───────────────────────────────────────────────────────────
   document.getElementById('topk').addEventListener('input', e => {
     document.getElementById('footer-topk').textContent = `top-k: ${e.target.value}`;
   });
-  document.getElementById('timeout-slider').addEventListener('input', e => {
-    updateFooterTimeout();
-  });
+  document.getElementById('timeout-slider').addEventListener('input', updateFooterTimeout);
   document.getElementById('no-timeout').addEventListener('change', updateFooterTimeout);
 
   function updateFooterTimeout() {
@@ -903,6 +1104,12 @@
         <div class="big">[ ]</div>
         <p>Ask anything about your documents.</p>
       </div>`;
+    // New session ID — server forgets prior context
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem('rag_session', sessionId);
+    sessionMsgCount = 0;
+    const el = document.getElementById('session-msg-count');
+    if (el) el.textContent = '0 msgs';
   }
 
   // ── Send ──────────────────────────────────────────────────────────────────
@@ -910,13 +1117,15 @@
     const query = textarea.value.trim();
     if (!query) return;
 
-    const topK       = parseInt(document.getElementById('topk').value);
-    const noLimit    = document.getElementById('no-timeout').checked;
-    const timeout    = noLimit ? null : parseInt(document.getElementById('timeout-slider').value);
+    const topK        = parseInt(document.getElementById('topk').value);
+    const noLimit     = document.getElementById('no-timeout').checked;
+    const timeout     = noLimit ? null : parseInt(document.getElementById('timeout-slider').value);
     const temperature = parseFloat(document.getElementById('temp-slider').value);
     const top_p       = parseFloat(document.getElementById('topp-slider').value);
     const llm_top_k   = parseInt(document.getElementById('llm-topk-slider').value);
     const min_p       = parseFloat(document.getElementById('minp-slider').value);
+    const use_bm25    = searchMethod === 'hybrid' || searchMethod === 'rerank';
+    const use_reranker = searchMethod === 'rerank';
 
     textarea.value = '';
     textarea.style.height = 'auto';
@@ -929,7 +1138,20 @@
       const res = await fetch('/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, top_k: topK, mode, timeout, max_tokens: parseInt(document.getElementById('max-tokens-slider').value), temperature, top_p, llm_top_k, min_p }),
+        body: JSON.stringify({
+          query,
+          top_k: topK,
+          mode,
+          timeout,
+          max_tokens: parseInt(document.getElementById('max-tokens-slider').value),
+          temperature,
+          top_p,
+          llm_top_k,
+          min_p,
+          session_id: sessionId,
+          use_bm25,
+          use_reranker,
+        }),
       });
 
       const elapsed = removeThinking();
@@ -941,6 +1163,12 @@
         const data = await res.json();
         appendMsg('assistant', data.answer, data.citations || [], elapsed);
         updateAnalytics();
+        // Update stored message count (1 user + 1 assistant = 2 messages per exchange)
+        if (mode === 'answer') {
+          sessionMsgCount += 2;
+          const el = document.getElementById('session-msg-count');
+          if (el) el.textContent = sessionMsgCount + ' msgs';
+        }
       }
     } catch (e) {
       removeThinking();

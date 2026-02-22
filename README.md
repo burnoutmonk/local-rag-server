@@ -1,8 +1,6 @@
 # Local RAG Server
 
-A fully local retrieval-augmented generation (RAG) system for querying PDF and DOCX documents using a local LLM. No cloud, no API keys — just drop in your documents and ask questions.
-
-> **v2.1.0** — Analytics sidebar, live tok/s tracking, max response tokens slider, GPU/CPU status badge
+A fully local retrieval-augmented generation (RAG) system for querying PDF and DOCX documents using a local LLM. Designed for multi-user deployment on corporate networks — no cloud, no API keys.
 
 ```
 PDF / DOCX files
@@ -20,6 +18,9 @@ PDF / DOCX files
  Qdrant (local vector store)
       |
       v
+ Hybrid retrieval (Dense + BM25 + optional cross-encoder reranker)
+      |
+      v
  FastAPI + llama.cpp  →  Browser UI
 ```
 
@@ -32,7 +33,7 @@ graph TD
     User((User))
     UI[Web Interface]
     API[FastAPI Backend]
-    
+
     subgraph Storage [Data Storage]
         Raw[data_raw folder]
         Qdrant[(Qdrant Vector DB)]
@@ -41,28 +42,28 @@ graph TD
     subgraph Logic [Processing Engine]
         Parse[Document Parser]
         Check{GPU Enabled?}
-        LCpp[llama-cpp-python]
+        LLM[llama.cpp Server]
     end
 
     %% Flow
-    User -->|1. Manually Place Docs| Raw
-    User -->|2. Set Config| Env[.env]
+    User -->|1. Place Docs| Raw
+    User -->|2. Configure| Env[.env]
     User -->|3. Chat| UI
-    
-    UI <-->|Stream| API
+
+    UI <-->|HTTP| API
     API -->|Scan| Raw
     Raw --> Parse -->|Embed| Qdrant
-    
-    API -->|Fetch Context| Qdrant
-    Qdrant -->|Context| LCpp
-    
+
+    API -->|Hybrid Retrieve| Qdrant
+    Qdrant -->|Context| LLM
+
     Env -->|Read| Check
     Check -->|Yes| GPU[NVIDIA CUDA]
     Check -->|No| CPU[System CPU]
-    
-    GPU --> LCpp
-    CPU --> LCpp
-    LCpp -->|Response| UI
+
+    GPU --> LLM
+    CPU --> LLM
+    LLM -->|Response| UI
 
     %% Styling
     style User fill:#f9f,stroke:#333,stroke-width:2px
@@ -85,7 +86,7 @@ http://192.168.x.x:8000
 **Exposing to the internet:**
 Use a reverse proxy like [Caddy](https://caddyserver.com/) or [nginx](https://nginx.org/) in front of port 8000, or use a tunnel like [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) for zero-config public access.
 
-> ⚠️ There is no authentication built in — if exposing publicly, put it behind a password-protected reverse proxy.
+> **Warning:** There is no authentication built in — if exposing publicly, put it behind a password-protected reverse proxy.
 
 ### Screenshot
 
@@ -97,9 +98,9 @@ Use a reverse proxy like [Caddy](https://caddyserver.com/) or [nginx](https://ng
 
 | Platform | Docker | Native |
 |---|---|---|
-| Linux | ✅ `./run.sh --docker` | ✅ `./run.sh` |
-| macOS | ⚠️ (not tested) `./run.sh --docker` | ⚠️ (not tested) `./run.sh` |
-| Windows | ✅ `start.bat` | ⚠️ WSL2 only |
+| Linux | `./run.sh --docker` | `./run.sh` |
+| macOS | `./run.sh --docker` | `./run.sh` |
+| Windows | `start.bat` | WSL2 only |
 
 **Windows users:** Just install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and double-click `start.bat` — no WSL2, Python, or manual setup needed.
 
@@ -138,8 +139,8 @@ sudo usermod -aG docker $USER && newgrp docker
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/burnoutmonk/local_rag.git
-cd local_rag
+git clone https://github.com/burnoutmonk/local-rag-server.git
+cd local-rag-server
 ```
 
 ### 2. Add your documents
@@ -231,21 +232,96 @@ Useful flags:
 
 ---
 
+## Startup Optimizations
+
+The Docker stack is optimized for fast restarts when nothing has changed:
+
+| Service | First run | Subsequent restarts |
+|---|---|---|
+| `model_downloader` | Downloads GGUF from HuggingFace | Shell `test -f` — exits in <1s |
+| `ingest` | Parses, chunks, and embeds all documents | Hash check only — skips embedding model load entirely |
+| `benchmark` | Waits for LLM, measures tok/s | Sees `.benchmarked_cpu` or `.benchmarked_gpu` marker — exits in <1s |
+
+The benchmark uses separate marker files for CPU and GPU modes so switching `LLM_GPU_LAYERS` always triggers a re-measurement on the next startup.
+
+To force a fresh benchmark, delete the appropriate marker file from the project root:
+```bash
+# GPU mode
+rm .benchmarked_gpu
+# CPU mode
+rm .benchmarked_cpu
+```
+
+---
+
 ## Configuration
 
 All settings live in `config.py` (native) and `.env` (Docker). They share the same values — environment variables in `.env` override the defaults in `config.py`.
 
+### LLM & Model
+
 | Setting | Default | Description |
 |---|---|---|
-| `LLM_MODEL_FILE` | `qwen2.5-3b-instruct-q4_k_m.gguf` | GGUF model filename |
-| `LLM_MODEL_REPO` | `Qwen/Qwen2.5-3B-Instruct-GGUF` | HuggingFace repo |
+| `LLM_MODEL_FILE` | `Llama-3.2-3B-Instruct-Q4_K_M.gguf` | GGUF model filename |
+| `LLM_MODEL_REPO` | `bartowski/Llama-3.2-3B-Instruct-GGUF` | HuggingFace repo |
 | `LLM_THREADS` | `8` | CPU threads for inference |
-| `LLM_CONTEXT` | `4096` | Context window size |
+| `LLM_CONTEXT` | `4096` | Context window size (GPU: use 32768+) |
 | `LLM_GPU_LAYERS` | `0` | GPU layers (`-1` = all, `0` = CPU only) |
+| `LLM_TEMPERATURE` | `0.7` | Sampling temperature |
+| `LLM_TOP_P` | `0.8` | Nucleus sampling threshold |
+| `LLM_TOP_K` | `20` | Top-K sampling |
+| `LLM_MIN_P` | `0.0` | Min-P sampling |
 | `MAX_TOKENS` | `500` | Max output tokens |
-| `TOKENS_PER_SECOND` | `10.0` | Your hardware speed (run `test_speed.py`) |
+| `MIN_TOKENS` | `150` | Min output tokens (timeout estimation floor) |
+| `TOKENS_PER_SECOND` | `10.0` | Measured hardware speed (set by benchmark) |
+| `CUDA_AVAILABLE` | `false` | Build llama.cpp with CUDA support |
+
+### Chunking
+
+| Setting | Default | Description |
+|---|---|---|
 | `MAX_CHARS` | `1000` | Max chars per chunk |
-| `OVERLAP_CHARS` | `100` | Chunk overlap |
+| `OVERLAP_CHARS` | `100` | Chunk overlap in chars |
+| `EMBED_MODEL_NAME` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model (changing requires full re-ingest) |
+
+### Chat Memory
+
+| Setting | Default | Description |
+|---|---|---|
+| `CHAT_MEMORY_TURNS` | `3` | Previous Q&A exchanges to include per session (0 to disable) |
+
+### Hybrid Retrieval
+
+| Setting | Default | Description |
+|---|---|---|
+| `BM25_WEIGHT` | `0.5` | BM25 fusion weight (0 = dense only, 1 = BM25 only) |
+| `RETRIEVAL_MULTIPLIER` | `4` | Candidates fetched = `top_k × multiplier` before reranking |
+| `RERANKER_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Cross-encoder model for reranking |
+| `RERANKER_ENABLED` | `true` | Allow users to enable reranking (set to `false` to disable globally) |
+
+> **Note:** LLM sampling parameters (temperature, top_p, top_k, min_p) and max tokens can be adjusted per-query from the web UI sidebar. The `.env` values are the defaults.
+
+---
+
+## Hybrid Search
+
+Retrieval uses a two-stage pipeline with user-selectable modes:
+
+**Dense** — Qdrant cosine similarity search only (fastest).
+
+**Hybrid** (default) — Dense search retrieves `top_k × RETRIEVAL_MULTIPLIER` candidates, then BM25 scores are computed on those candidates and fused with dense scores using `BM25_WEIGHT`.
+
+**Hybrid + Rerank** — Adds a cross-encoder pass after Hybrid. The cross-encoder scores all candidates as (query, text) pairs and re-orders them. Adds 1–3 seconds of latency but improves precision for complex queries.
+
+Users select the search mode via the three buttons in the UI sidebar. The rerank button is greyed out if `RERANKER_ENABLED=false` on the server.
+
+---
+
+## Chat Memory
+
+Each browser tab gets an independent session (via `sessionStorage`). The server keeps the last `CHAT_MEMORY_TURNS` exchanges (default 3) in memory per session, prepending them to each LLM prompt for conversational context.
+
+Sessions expire automatically after 2 hours of inactivity. Clicking "Clear chat" in the UI starts a new session and discards prior history.
 
 ---
 
@@ -253,13 +329,13 @@ All settings live in `config.py` (native) and `.env` (Docker). They share the sa
 
 Using a GPU massively improves generation speed — expect 100–150 tok/s on a 4070 Ti vs 5–15 tok/s on CPU.
 
-**Which CUDA version?** Install **CUDA 12** — it is stable, widely supported, and what llama.cpp officially targets. CUDA 13 also works but is newer and less tested.
+**Which CUDA version?** Install **CUDA 12** — it is stable, widely supported, and what llama.cpp officially targets.
 
 ---
 
 ### Windows (Docker — recommended)
 
-> ✅ Tested and working with a 4070 Ti on Windows 11 + Docker Desktop.
+> Tested and working with a 4070 Ti on Windows 11 + Docker Desktop.
 
 1. Make sure you have an up to date NVIDIA driver — download from [nvidia.com/drivers](https://www.nvidia.com/Download/index.aspx)
 2. Verify: open CMD and run `nvidia-smi`
@@ -268,7 +344,8 @@ Using a GPU massively improves generation speed — expect 100–150 tok/s on a 
 CUDA_AVAILABLE=true
 LLM_GPU_LAYERS=-1
 ```
-4. Run `start.bat` — Docker pulls the CUDA 12 toolkit automatically inside the container, no local CUDA install needed
+4. Delete `.benchmarked_gpu` if it exists (to force re-measurement)
+5. Run `start.bat` — Docker pulls the CUDA 12 toolkit automatically inside the container, no local CUDA install needed
 
 ---
 
@@ -303,7 +380,8 @@ rm -rf llama.cpp/build
 CUDA_AVAILABLE=true
 LLM_GPU_LAYERS=-1
 ```
-3. Run `./run.sh --docker`
+3. Delete `.benchmarked_gpu` to re-measure speed with GPU
+4. Run `./run.sh --docker`
 
 ---
 
@@ -312,55 +390,70 @@ LLM_GPU_LAYERS=-1
 ### Common operations
 
 ```bash
-docker compose up -d        # start all services
-docker compose down         # stop all services
-docker compose logs -f      # follow logs from all services
-docker compose logs -f api  # follow logs from a specific service
+docker compose -f docker/docker-compose.yml up -d        # start all services
+docker compose -f docker/docker-compose.yml down         # stop all services
+docker compose -f docker/docker-compose.yml logs -f      # follow logs from all services
+docker compose -f docker/docker-compose.yml logs -f api  # follow logs from a specific service
 ```
+
+Or use `start.bat` / `run.sh --docker` which handle the `-f` paths automatically.
 
 ### When to rebuild
 
 Most changes do NOT require a rebuild — just restart:
 
-```bash
-docker compose up -d   # picks up .env changes automatically
-```
-
-| Change | Command |
+| Change | Action |
 |---|---|
-| `.env` parameters (tokens, threads, context) | `docker compose up -d` |
-| New model | update `.env`, then `docker compose up -d` |
-| Python code changes | `docker compose build api && docker compose up -d` |
-| Switch GPU layers on/off | set `LLM_GPU_LAYERS=-1` or `0` in `.env`, then `start.bat` (no rebuild needed) |
-| Switch CPU binary → GPU binary | set `CUDA_AVAILABLE=true` in `.env`, then `start.bat` (full rebuild) |
-| Update llama.cpp | `docker compose build llm && docker compose up -d` |
+| `.env` parameters (tokens, threads, context) | Restart: `start.bat` or `./run.sh --docker` |
+| New model | Update `.env`, then restart |
+| New/changed documents in `data_raw/` | Restart — ingest detects changes automatically |
+| Python code changes | `docker compose -f docker/docker-compose.yml build api && start.bat` |
+| Switch GPU layers on/off | Set `LLM_GPU_LAYERS` in `.env`, delete `.benchmarked_gpu` or `.benchmarked_cpu`, restart |
+| Switch CPU build to GPU build | Set `CUDA_AVAILABLE=true` in `.env`, then `start.bat` (full rebuild) |
+| Change embedding model | Update `EMBED_MODEL_NAME` in `.env`, then `docker volume rm local_rag_ingest_state` and restart |
 
 ### Switching models
 
 1. Edit `.env` and set the new `LLM_MODEL_FILE` and `LLM_MODEL_REPO`
-2. Run `docker compose up -d`
-3. `model_downloader` will automatically fetch the new model if it isn't in `models/` already
+2. Delete `.benchmarked_gpu` or `.benchmarked_cpu` (new model = different speed)
+3. Restart — `model_downloader` will automatically fetch the new model
 
 ### Re-ingesting documents
 
-If you add or change documents in `data_raw/`:
+Ingestion runs automatically on startup and only processes changed or new files (tracked via MD5 hashes). Deleted files are automatically detected and removed from the vector store. To force a full re-ingest:
 
 ```bash
-docker compose run --rm ingest
+docker volume rm local_rag_ingest_state
 ```
-
-This runs ingestion once and exits. Only changed or new files are re-ingested thanks to hash tracking.
 
 ---
 
 ## API Endpoints
 
 ### `POST /answer`
-Retrieves relevant chunks and generates an answer with the LLM.
+Retrieves relevant chunks via hybrid search and generates an answer with the LLM.
 ```bash
 curl -X POST http://localhost:8000/answer \
   -H "Content-Type: application/json" \
   -d '{"query": "what is X", "top_k": 5, "mode": "answer", "timeout": 60}'
+```
+
+Full request options:
+```json
+{
+  "query": "what is X",
+  "top_k": 5,
+  "mode": "answer",
+  "timeout": 60,
+  "max_tokens": 500,
+  "temperature": 0.7,
+  "top_p": 0.8,
+  "llm_top_k": 20,
+  "min_p": 0.0,
+  "session_id": "optional-uuid-for-chat-memory",
+  "use_bm25": true,
+  "use_reranker": false
+}
 ```
 
 ### `POST /answer` (search mode)
@@ -371,12 +464,15 @@ curl -X POST http://localhost:8000/answer \
   -d '{"query": "what is X", "top_k": 5, "mode": "search"}'
 ```
 
+### `POST /search`
+Dedicated search endpoint — returns scored chunks with metadata.
+
 ### `GET /metrics`
 
-Returns per-query analytics history for the current session (tok/s, prompt tokens, response tokens, response time).
+Returns per-query analytics history for the current server session (tok/s, prompt tokens, response tokens, response time).
 
 ### `GET /health`
-Returns `{"ok": true}` if the API is running.
+Returns server status including GPU/CUDA state, model info, measured tok/s, and full server configuration.
 
 ---
 
@@ -386,8 +482,17 @@ Returns `{"ok": true}` if the API is running.
 .
 ├── data_raw/                  # Place your PDF and DOCX files here
 ├── models/                    # GGUF model downloaded here automatically
+├── docker/
+│   ├── docker-compose.yml     # Full stack orchestration
+│   ├── docker-compose.gpu.yml # GPU overlay (merged by start.bat/run.sh)
+│   ├── Dockerfile             # CPU image for all Python services
+│   └── Dockerfile.cuda        # GPU image (CUDA 12, nvidia base)
+├── scripts/
+│   ├── benchmark.py           # LLM speed benchmark (Docker)
+│   ├── test_speed.py          # Manual LLM speed test (native)
+│   └── qdrant_test.py         # Qdrant connectivity test
 ├── templates/
-│   └── index.html             # Browser UI with GPU/CPU status badge
+│   └── index.html             # Browser UI (single file, no build step)
 ├── config.py                  # All settings (native workflow)
 ├── .env.example               # All settings (Docker workflow) — copy to .env
 ├── run.sh                     # Linux/macOS entry point (native or --docker)
@@ -396,12 +501,6 @@ Returns `{"ok": true}` if the API is running.
 ├── ingest.py                  # Parse, chunk, embed, and upsert into Qdrant
 ├── rag_api.py                 # FastAPI retrieval + LLM answer API
 ├── download_model.py          # Auto model downloader (Docker)
-├── benchmark.py               # LLM speed benchmark (Docker)
-├── test_speed.py              # Manual LLM speed test (native)
-├── Dockerfile                 # CPU image for all Python services
-├── Dockerfile.cuda            # GPU image (CUDA 12, nvidia base)
-├── docker-compose.yml         # Full stack orchestration
-├── docker-compose.gpu.yml     # GPU overlay (merged by start.bat/run.sh)
 └── requirements.txt
 ```
 
@@ -409,13 +508,18 @@ Returns `{"ok": true}` if the API is running.
 
 ## Tips
 
+- **Search method:** Hybrid (Dense + BM25) is the default. Switch to Dense for the fastest results or Hybrid + Rerank for the best precision on complex queries.
 - **Retrieval quality:** `top_k=5` is a good default. Increase if answers feel incomplete.
 - **Chunk size:** `MAX_CHARS=1000` works well for most documents. Reduce to 600–700 for documents with many short definitions.
-- **Incremental ingestion:** Only changed or new files are re-ingested. Delete `.ingest_hashes.json` to force a full re-ingest.
-- **Upgrading embeddings:** Swap MiniLM for `BAAI/bge-m3` and enable hybrid dense+sparse search for better retrieval quality (requires GPU).
-- **Max response tokens:** Use the slider in the UI to control response length. 500 is a good default — increase for more detailed answers.
-- **Analytics:** The sidebar tracks tok/s, prompt/response token counts, and average response time per session. Resets on container restart.
-- **GPU toggle:** Set `LLM_GPU_LAYERS=-1` or `0` in `.env` and restart — no rebuild needed to switch GPU on/off.
+- **Incremental ingestion:** Only changed or new files are re-ingested. Deleted files are automatically removed from the vector store.
+- **LLM sampling:** Adjust temperature, top_p, top_k, and min_p from the sidebar in the web UI — changes apply per-query without restarting.
+- **Max response tokens:** Use the slider in the UI to control response length. The admin-configured `MAX_TOKENS` value is the ceiling.
+- **Chat memory:** Each browser tab maintains its own session. "Clear chat" in the UI starts a fresh session. Set `CHAT_MEMORY_TURNS=0` in `.env` to disable memory entirely.
+- **Analytics:** The sidebar tracks tok/s and response time per query with live sparkline graphs. System stats (CPU, RAM, GPU) show peak values since page load.
+- **Config panel:** The UI sidebar shows a read-only view of server admin settings (context window, threads, GPU layers, chunk size, reranker model, etc.).
+- **CPU context warning:** If running in CPU mode with a context window above 4096, the UI shows a warning — large contexts are very slow on CPU.
+- **GPU toggle:** Set `LLM_GPU_LAYERS=-1` or `0` in `.env` and restart. The benchmark auto-detects the mode and re-runs automatically when you switch.
+- **Re-benchmark:** Delete `.benchmarked_gpu` or `.benchmarked_cpu` from the project root to force a speed measurement on next startup.
 
 ---
 

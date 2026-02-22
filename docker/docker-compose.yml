@@ -117,6 +117,7 @@ services:
     image: local_rag-app
     container_name: rag_benchmark
     command: python3 benchmark.py
+    env_file: ../.env
     volumes:
       - ..:/app/host_env  # mount project dir so benchmark can update .env
     environment:

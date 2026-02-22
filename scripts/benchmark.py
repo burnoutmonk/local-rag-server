@@ -13,9 +13,13 @@ from pathlib import Path
 LLM_PORT    = int(os.environ.get("LLM_PORT", 8080))
 LLM_URL     = os.environ.get("LLM_URL", f"http://rag_llm:{LLM_PORT}/v1/chat/completions")
 ENV_FILE    = Path("/app/host_env/.env")
-MARKER_FILE = Path("/app/host_env/.benchmarked")
 
-PROMPT = "Write a detailed technical explanation of how a CPU processes instructions."
+# Use separate marker files for CPU and GPU so switching modes triggers a re-benchmark
+_gpu = int(os.environ.get("LLM_GPU_LAYERS", 0)) != 0
+MARKER_FILE = Path("/app/host_env/.benchmarked_gpu" if _gpu else "/app/host_env/.benchmarked_cpu")
+_mode_label = "GPU" if _gpu else "CPU"
+
+PROMPT = "Give a short summary of uploaded sources."
 
 
 def wait_for_llm(timeout: int = 600) -> None:
@@ -35,11 +39,14 @@ def wait_for_llm(timeout: int = 600) -> None:
     raise SystemExit(1)
 
 
+_max_tokens = 500 if _gpu else 50
+
+
 def measure() -> float:
     payload = json.dumps({
         "model": "local",
         "messages": [{"role": "user", "content": PROMPT}],
-        "max_tokens": 25,
+        "max_tokens": _max_tokens,
         "temperature": 0.7,
         "stream": False,
     }).encode()
@@ -74,26 +81,28 @@ def update_env(tok_s: float) -> None:
 
 
 def main() -> None:
-    print("\nLLM Speed Benchmark")
+    print(f"\nLLM Speed Benchmark [{_mode_label}]")
     print("=" * 40)
 
     if MARKER_FILE.exists():
-        print("  Already benchmarked — skipping.")
-        print("  (Delete .benchmarked from project root to re-run)")
+        cached = MARKER_FILE.read_text().strip()
+        print(f"  Already benchmarked ({_mode_label}) — skipping.")
+        print(f"  Cached result: {cached} tok/s")
+        print(f"  (Delete {MARKER_FILE.name} from project root to re-run)")
         print("=" * 40)
         return
 
     wait_for_llm()
 
-    print("Running inference pass...", end="", flush=True)
+    print(f"Running inference pass ({_max_tokens} tokens)...", end="", flush=True)
     tok_s = measure()
     print(f" {tok_s} tok/s")
 
     update_env(tok_s)
-    MARKER_FILE.write_text("")
+    MARKER_FILE.write_text(str(tok_s))
 
     print("=" * 40)
-    print(f"  Result: {tok_s} tok/s")
+    print(f"  Result: {tok_s} tok/s  [{_mode_label}]")
     print("=" * 40)
 
 

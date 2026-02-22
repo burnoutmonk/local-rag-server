@@ -10,3 +10,5 @@ numpy
 tqdm
 jinja2
 huggingface-hub
+psutil
+rank-bm25
