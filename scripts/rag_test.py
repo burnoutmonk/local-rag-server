@@ -86,8 +86,8 @@ def generate_questions(num_questions: int) -> list[dict]:
     print(f"  Collection has {total_points} points. Sampling {num_questions} random chunks...")
 
     # Scroll to get actual points (IDs are UUIDs, not sequential integers)
-    # Oversample then randomly pick to get a representative spread
-    oversample = min(num_questions * 5, total_points)
+    # Oversample generously — many chunks will be filtered (citations, tables, short)
+    oversample = min(num_questions * 8, total_points)
     print(f"  Scrolling {oversample} points from collection...")
     all_points, _ = client.scroll(
         collection_name=COLLECTION,
@@ -113,27 +113,39 @@ def generate_questions(num_questions: int) -> list[dict]:
         source_file = payload.get("source_file", "unknown")
 
         if not chunk_text:
-            print(f"  [{i}/{len(sampled_points)}] Skipping point with empty text (source: {source_file})")
+            print(f"  [{i}/{len(sampled_points)}] Skipping: empty text ({source_file})")
+            continue
+
+        # Skip low-quality chunks: too short or mostly non-alphabetic (citations, tables, code)
+        words = chunk_text.split()
+        alpha_ratio = sum(1 for w in words if w.isalpha()) / max(len(words), 1)
+        if len(words) < 30 or alpha_ratio < 0.5:
+            print(f"  [{i}/{len(sampled_points)}] Skipping: low-quality chunk ({len(words)} words, {alpha_ratio:.0%} alpha) from {source_file}")
             continue
 
         # Truncate chunk to keep prompts small and prefill fast
         chunk_for_prompt = chunk_text[:800]
 
         # Ask LLM to generate a question
-        prompt = f"""Given this text, generate ONE factual question that can be answered ONLY from this text.
-Also provide the correct answer based on the text.
+        prompt = f"""You are creating a retrieval benchmark. Read this text and write ONE good test question.
+
+Rules:
+- The question must be answerable using ONLY the information in this text
+- The question must ask about a specific fact, concept, or finding — NOT about authorship, citations, or references
+- The answer must be a specific, complete phrase found in the text (not just "yes" or a name)
+- If the text is a reference list, table of contents, or mostly citations, reply with: {{"skip": true}}
 
 Text:
 {chunk_for_prompt}
 
-Respond ONLY with valid JSON (no markdown, no extra text):
+Reply ONLY with valid JSON, no markdown:
 {{"question": "...", "answer": "..."}}"""
 
         payload_llm = {
             "model": "local",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 200,
-            "temperature": 0.5,
+            "temperature": 0.3,
             "stream": False,
         }
 
@@ -141,20 +153,34 @@ Respond ONLY with valid JSON (no markdown, no extra text):
             response = http_post(DEFAULT_LLM_URL, payload_llm, timeout=120)
             content = response["choices"][0]["message"]["content"].strip()
 
-            # Parse JSON response — handle markdown code fences
+            # Handle markdown code fences
             if "```" in content:
                 content = content.split("```")[1].lstrip("json").strip()
 
             qa = json.loads(content)
+
+            # LLM signalled the chunk is not suitable
+            if qa.get("skip"):
+                print(f"  [{i}/{len(sampled_points)}] Skipping: LLM flagged chunk as unsuitable ({source_file})")
+                continue
+
+            question = qa.get("question", "").strip()
+            answer = qa.get("answer", "").strip()
+
+            # Sanity check: reject trivially short or templated outputs
+            if len(question) < 15 or len(answer) < 3 or "..." in question:
+                print(f"  [{i}/{len(sampled_points)}] Skipping: LLM returned placeholder/trivial QA ({source_file})")
+                continue
+
             qa_pairs.append({
-                "question": qa["question"],
-                "answer": qa["answer"],
+                "question": question,
+                "answer": answer,
                 "source_file": source_file,
                 "source_chunk": chunk_text[:500],
             })
-            print(f"  [{i}/{len(sampled_points)}] Generated question from {source_file}")
+            print(f"  [{i}/{len(sampled_points)}] OK: {question[:70]}")
         except Exception as e:
-            print(f"  [{i}/{len(sampled_points)}] FAILED to generate question: {e}")
+            print(f"  [{i}/{len(sampled_points)}] FAILED ({source_file}): {e}")
             continue
 
     elapsed = time.time() - t0
