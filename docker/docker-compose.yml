@@ -218,7 +218,6 @@ services:
       - QDRANT_HOST=qdrant_test
       - QDRANT_PORT=6333
       - QDRANT_COLLECTION=rag_docs_test
-      - LLM_URL=http://rag_llm:8080/v1/chat/completions
       - RAG_API_URL=http://rag_api:8000
     volumes:
       - ..:/app/project

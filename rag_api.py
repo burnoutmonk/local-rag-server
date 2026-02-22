@@ -156,6 +156,35 @@ class QueryIn(BaseModel):
     use_reranker: bool = False
 
 
+class CompleteIn(BaseModel):
+    messages: list[dict]
+    max_tokens: int = 200
+    temperature: float = 0.5
+
+
+@app.post("/complete")
+def complete(req: CompleteIn):
+    """Direct LLM completion through the LLM_LOCK — for internal tooling (e.g. rag_test)."""
+    payload = {
+        "model": "local",
+        "messages": req.messages,
+        "max_tokens": req.max_tokens,
+        "temperature": req.temperature,
+        "stream": False,
+    }
+    if not LLM_LOCK.acquire(blocking=True, timeout=300):
+        raise HTTPException(status_code=503, detail="LLM lock timeout")
+    try:
+        with httpx.Client(timeout=httpx.Timeout(300, connect=10.0)) as h:
+            r = h.post(LLM_URL, json=payload)
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"LLM error: {repr(e)}")
+    finally:
+        LLM_LOCK.release()
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})

@@ -22,7 +22,8 @@ from typing import Any
 import os
 
 DEFAULT_API_URL = os.environ.get("RAG_API_URL", "http://localhost:8000")
-DEFAULT_LLM_URL = os.environ.get("LLM_URL", "http://rag_llm:8080/v1/chat/completions")
+# All LLM calls go through the API /complete endpoint (respects LLM_LOCK, no direct llama.cpp access)
+DEFAULT_LLM_URL = os.environ.get("RAG_API_URL", "http://localhost:8000") + "/complete"
 DEFAULT_NUM_QUESTIONS = 20
 DEFAULT_TOP_K = 5
 DEFAULT_OUTPUT = "test_results.json"
