@@ -129,8 +129,10 @@ if [ -f "docker/docker-compose.yml" ] && [ "$1" = "--docker" ]; then
     if grep -q "CUDA_AVAILABLE=true" .env 2>/dev/null; then
         echo "  GPU mode enabled — using docker/docker-compose.gpu.yml"
         docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d --build
+        docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test build rag_test
     else
         docker compose -f docker/docker-compose.yml up -d --build
+        docker compose -f docker/docker-compose.yml --profile test build rag_test
     fi
     echo "Waiting for services to be ready..."
     while ! docker inspect rag_ready --format "{{.State.Status}}" 2>/dev/null | grep -q "exited"; do

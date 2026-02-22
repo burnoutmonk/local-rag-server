@@ -29,10 +29,12 @@ echo !CUDA_AVAILABLE!>.last_cuda
 if "!CUDA_AVAILABLE!"=="true" (
     echo Starting with GPU support...
     docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml build !BUILD_FLAG!
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test build !BUILD_FLAG! rag_test
     docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d
 ) else (
     echo Starting in CPU mode...
     docker compose -f docker/docker-compose.yml build !BUILD_FLAG!
+    docker compose -f docker/docker-compose.yml --profile test build !BUILD_FLAG! rag_test
     docker compose -f docker/docker-compose.yml up -d
 )
 
