@@ -26,13 +26,20 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv"
+
+# In WSL, 'docker' on PATH is the Windows binary which doesn't handle
+# 'docker compose -f ...' correctly. Use 'docker.exe' instead.
+DOCKER_CMD="docker"
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    DOCKER_CMD="docker.exe"
+fi
 LLAMA_DIR="$SCRIPT_DIR/llama.cpp"
 LLAMA_BIN="$LLAMA_DIR/build/bin/llama-server"
 
 cd "$SCRIPT_DIR"
 
 # ── Check for conflicting Docker Compose stack ────────────────────────────────
-if docker ps --format "{{.Names}}" 2>/dev/null | grep -qE "rag_api|rag_llm|rag_ingest"; then
+if $DOCKER_CMD ps --format "{{.Names}}" 2>/dev/null | grep -qE "rag_api|rag_llm|rag_ingest"; then
     echo "ERROR: Docker Compose stack appears to be already running."
     echo "  Stop it first with: docker compose down"
     echo "  Then run: ./run.sh"
@@ -40,7 +47,7 @@ if docker ps --format "{{.Names}}" 2>/dev/null | grep -qE "rag_api|rag_llm|rag_i
 fi
 
 # ── Check for conflicting Qdrant container ────────────────────────────────────
-if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^qdrant$"; then
+if $DOCKER_CMD ps --format "{{.Names}}" 2>/dev/null | grep -q "^qdrant$"; then
     echo "WARNING: A Qdrant container is already running on port 6333."
     echo "  This may have been started by a previous Docker Compose run."
     echo "  Stop it with: docker stop qdrant && docker rm qdrant"
@@ -128,14 +135,14 @@ if [ -f "docker/docker-compose.yml" ] && [ "$1" = "--docker" ]; then
     # Use GPU compose override if CUDA_AVAILABLE is set
     if grep -q "CUDA_AVAILABLE=true" .env 2>/dev/null; then
         echo "  GPU mode enabled — using docker/docker-compose.gpu.yml"
-        docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test build
-        docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d
+        $DOCKER_CMD compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml --profile test build
+        $DOCKER_CMD compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up -d
     else
-        docker compose -f docker/docker-compose.yml --profile test build
-        docker compose -f docker/docker-compose.yml up -d
+        $DOCKER_CMD compose -f docker/docker-compose.yml --profile test build
+        $DOCKER_CMD compose -f docker/docker-compose.yml up -d
     fi
     echo "Waiting for services to be ready..."
-    while ! docker inspect rag_ready --format "{{.State.Status}}" 2>/dev/null | grep -q "exited"; do
+    while ! $DOCKER_CMD inspect rag_ready --format "{{.State.Status}}" 2>/dev/null | grep -q "exited"; do
         sleep 2
     done
     echo "Opening browser..."

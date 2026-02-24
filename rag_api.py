@@ -12,6 +12,15 @@ import time
 
 psutil.cpu_percent()  # prime — discard first meaningless reading
 
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    
 from config import (
     QDRANT_HOST, QDRANT_PORT, COLLECTION,
     EMBED_MODEL_NAME,
@@ -86,8 +95,10 @@ def build_context(points, max_total_chars: int = MAX_CONTEXT_CHARS) -> str:
 
 
 def hybrid_retrieve(query: str, top_k: int, use_bm25: bool, use_reranker: bool):
+    print(f"\n{Colors.HEADER}--- Retrieval Phase ---{Colors.ENDC}")
     """Retrieve top_k points using dense search, optionally fused with BM25 and reranked."""
     candidate_limit = top_k * RETRIEVAL_MULTIPLIER if (use_bm25 or use_reranker) else top_k
+    print(f"[*] Querying Qdrant (limit={candidate_limit})...")
 
     vec = embedder.encode([query], normalize_embeddings=True)[0].tolist()
     res = client.query_points(
@@ -100,9 +111,11 @@ def hybrid_retrieve(query: str, top_k: int, use_bm25: bool, use_reranker: bool):
     points = res.points
 
     if not points:
+        print(f"{Colors.RED}[!] No points found in Qdrant.{Colors.ENDC}")
         return points
 
     if use_bm25:
+        print(f"[*] Applying BM25 fusion (Weight: {BM25_WEIGHT})...")
         from rank_bm25 import BM25Okapi
         corpus = [(p.payload or {}).get("text", "") for p in points]
         tokenized = [doc.lower().split() for doc in corpus]
@@ -125,6 +138,7 @@ def hybrid_retrieve(query: str, top_k: int, use_bm25: bool, use_reranker: bool):
         points = [p for _, p in sorted(zip(fused, points), key=lambda x: x[0], reverse=True)]
 
     if use_reranker and RERANKER_ENABLED:
+        print(f"[*] Running Reranker ({RERANKER_MODEL})...")
         reranker = get_reranker()
         texts = [(p.payload or {}).get("text", "") for p in points]
         pairs = [[query, t] for t in texts]
@@ -291,6 +305,9 @@ def search(q: QueryIn):
 @app.post("/answer")
 def answer(q: QueryIn):
     _cleanup_sessions()
+    print(f"\n{Colors.BOLD}{Colors.BLUE}================ NEW REQUEST ================{Colors.ENDC}")
+    print(f"{Colors.BLUE}Query:{Colors.ENDC} {q.query}")
+    print(f"{Colors.BLUE}Mode:{Colors.ENDC} {q.mode} | {Colors.BLUE}Session:{Colors.ENDC} {q.session_id}")
 
     # 1) Retrieve
     points = hybrid_retrieve(q.query, q.top_k, q.use_bm25, q.use_reranker)

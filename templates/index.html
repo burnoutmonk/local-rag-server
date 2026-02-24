@@ -778,7 +778,7 @@
   // ── Session ID (per browser tab) ──────────────────────────────────────────
   let sessionId = sessionStorage.getItem('rag_session');
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    sessionId = generateUUID();
     sessionStorage.setItem('rag_session', sessionId);
   }
 
@@ -1097,6 +1097,20 @@
     return elapsed;
   }
 
+
+function generateUUID() {
+  // Use modern API if available
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback for non-secure contexts or older browsers
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
+  );
+}
+    
+
   function clearChat() {
     const chat = document.getElementById('chat');
     chat.innerHTML = `
@@ -1105,7 +1119,11 @@
         <p>Ask anything about your documents.</p>
       </div>`;
     // New session ID — server forgets prior context
-    sessionId = crypto.randomUUID();
+    let sessionId = sessionStorage.getItem('rag_session');
+    if (!sessionId) {
+      sessionId = generateUUID();
+      sessionStorage.setItem('rag_session', sessionId);
+    }
     sessionStorage.setItem('rag_session', sessionId);
     sessionMsgCount = 0;
     const el = document.getElementById('session-msg-count');
