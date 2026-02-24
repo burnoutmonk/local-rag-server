@@ -254,23 +254,41 @@ def measure_token_speed() -> float:
 
 
 def benchmark_llm() -> None:
+    import re
     section("Step 4.5/5 — Measuring LLM speed")
     print("  Running a quick inference pass to estimate tok/s...")
     try:
         tok_s = measure_token_speed()
         print(f"  Estimated speed: {tok_s} tok/s")
-        print(f"  Updating TOKENS_PER_SECOND in config.py...")
 
+        # Always update config.py (native workflow source of truth)
+        # Update the default value inside env_float() in config.py
         config_path = Path(__file__).resolve().parent / "config.py"
         config_text = config_path.read_text()
-        import re
         config_text = re.sub(
-            r"TOKENS_PER_SECOND\s*=\s*[\d.]+",
-            f"TOKENS_PER_SECOND = {tok_s}",
+            r'(TOKENS_PER_SECOND\s*=\s*env_float\("TOKENS_PER_SECOND",\s*)[\d.]+(\))',
+            rf'\g<1>{tok_s}\2',
             config_text,
         )
         config_path.write_text(config_text)
         print(f"  config.py updated.")
+
+        # Also update .env if present — it overrides config.py when run.sh exports it
+        env_path = Path(__file__).resolve().parent / ".env"
+        if env_path.exists():
+            env_text = env_path.read_text()
+            if "TOKENS_PER_SECOND" in env_text:
+                env_text = re.sub(
+                    r"^TOKENS_PER_SECOND=.*$",
+                    f"TOKENS_PER_SECOND={tok_s}",
+                    env_text,
+                    flags=re.MULTILINE,
+                )
+            else:
+                env_text += f"\nTOKENS_PER_SECOND={tok_s}\n"
+            env_path.write_text(env_text)
+            print(f"  .env updated.")
+
     except Exception as e:
         print(f"  WARNING: Speed measurement failed ({e}) — keeping existing value.")
 
