@@ -17,7 +17,7 @@ else
     exit 1
 fi
 
-Diagnostic check to ensure GPU is ready
+# Diagnostic check to ensure GPU is ready
 if [ "$CUDA_AVAILABLE" = "true" ]; then
     echo "🚀 Launching with GPU Layers: $LLM_GPU_LAYERS"
 fi
@@ -57,7 +57,7 @@ fi
 source "$VENV_DIR/bin/activate"
 
 echo "Installing Python requirements..."
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt
 echo "  Done."
 echo ""
 

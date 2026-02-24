@@ -280,7 +280,9 @@ def start_api(procs: list) -> None:
     cmd = [sys.executable, "-m", "uvicorn", "rag_api:app", "--host", API_HOST, "--port", str(API_PORT)]
     proc = subprocess.Popen(cmd)
     procs.append(("Web UI", proc))
-    wait_for_http(f"http://localhost:{API_PORT}/health", "Web UI", 60)
+    # Large timeout: on first run uvicorn loads SentenceTransformer at import time
+    # which may need to download the embedding model (~90MB) before serving begins
+    wait_for_http(f"http://localhost:{API_PORT}/health", "Web UI", 300)
     print(f"\n  Open your browser at: http://<your-server-ip>:{API_PORT}")
 
 
